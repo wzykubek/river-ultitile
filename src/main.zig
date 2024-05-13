@@ -30,34 +30,19 @@ const wayland = @import("wayland");
 const wl = wayland.client.wl;
 const river = wayland.client.river;
 
-const log = std.log.scoped(.rivercarro);
+const layout_config = @import("./layout.zig");
+
+const log = std.log.scoped(.@"river-ultitile");
 
 const gpa = std.heap.c_allocator;
 
 const usage =
-    \\Usage: rivercarro [options...]
+    \\Usage: river-ultitile [options...]
     \\
     \\  -h              Print this help message and exit.
-    \\  -version        Print the version number and exit.
-    \\  -no-smart-gaps  Disable smart gaps
-    \\  -per-tag        Remember configuration per tag
+    \\  --version       Print the version number and exit.
     \\
-    \\  The following commands may also be sent to rivercarro at runtime
-    \\  via riverctl(1):
-    \\
-    \\  -inner-gaps     Set the gaps around views in pixels. (Default 6)
-    \\  -outer-gaps     Set the gaps around the edge of the layout area in
-    \\                  pixels. (Default 6)
-    \\  -main-location  Set the initial location of the main area in the
-    \\                  layout. (Default left)
-    \\  -main-count     Set the initial number of views in the main area of the
-    \\                  layout. (Default 1)
-    \\  -main-ratio     Set the initial ratio of main area to total layout
-    \\                  area. (Default: 0.6)
-    \\  -width-ratio    Set the ratio of the usable area width of the screen.
-    \\                  (Default: 1.0)
-    \\
-    \\  See rivercarro(1) man page for more documentation.
+    \\  See river-ultitile(1) man page for more documentation.
     \\
 ;
 
@@ -123,13 +108,13 @@ const Output = struct {
     }
 
     fn get_layout(output: *Output) !void {
-        output.layout = try ctx.layout_manager.?.getLayout(output.wl_output, "rivercarro");
+        output.layout = try ctx.layout_manager.?.getLayout(output.wl_output, "river-ultitile");
         output.layout.setListener(*Output, layout_listener, output);
     }
 
     fn layout_listener(layout: *river.LayoutV3, event: river.LayoutV3.Event, output: *Output) void {
         switch (event) {
-            .namespace_in_use => fatal("namespace 'rivercarro' already in use.", .{}),
+            .namespace_in_use => fatal("namespace 'river-ultitile' already in use.", .{}),
 
             .user_command => |ev| {
                 var it = mem.tokenize(u8, mem.span(ev.command), " ");
@@ -274,154 +259,43 @@ const Output = struct {
             },
 
             .layout_demand => |ev| {
-                assert(ev.view_count > 0);
-
-                const active_cfg = output.get_cfg(ev.tags);
-                const main_count = @min(active_cfg.main_count, @as(u31, @truncate(ev.view_count)));
-                const sec_count = @as(u31, @truncate(ev.view_count)) -| main_count;
-
-                const only_one_view = ev.view_count == 1 or active_cfg.main_location == .monocle;
-
-                // Don't add gaps if there is only one view.
-                if (only_one_view and cfg.smart_gaps) {
-                    cfg.outer_gaps = 0;
-                    cfg.inner_gaps = 0;
-                } else {
-                    cfg.outer_gaps = active_cfg.outer_gaps;
-                    cfg.inner_gaps = active_cfg.inner_gaps;
-                }
-
-                const usable_w = switch (active_cfg.main_location) {
-                    .left, .right, .monocle => @as(
-                        u31,
-                        @intFromFloat(@as(f64, @floatFromInt(ev.usable_width)) * active_cfg.width_ratio),
-                    ) -| (2 *| cfg.outer_gaps),
-                    .top, .bottom => @as(u31, @truncate(ev.usable_height)) -| (2 *| cfg.outer_gaps),
+                handle_layout_demand(layout, ev.view_count, ev.usable_width, ev.usable_height, ev.tags, ev.serial) catch |err| {
+                    log.err("failed to handle layout demand: {}", .{err});
+                    return;
                 };
-                const usable_h = switch (active_cfg.main_location) {
-                    .left, .right, .monocle => @as(u31, @truncate(ev.usable_height)) -| (2 *| cfg.outer_gaps),
-                    .top, .bottom => @as(
-                        u31,
-                        @intFromFloat(@as(f64, @floatFromInt(ev.usable_width)) * active_cfg.width_ratio),
-                    ) -| (2 *| cfg.outer_gaps),
-                };
-
-                // To make things pixel-perfect, we make the first main and first sec
-                // view slightly larger if the height is not evenly divisible.
-                var main_w: u31 = undefined;
-                var main_h: u31 = undefined;
-                var main_h_rem: u31 = undefined;
-
-                var sec_w: u31 = undefined;
-                var sec_h: u31 = undefined;
-                var sec_h_rem: u31 = undefined;
-
-                if (active_cfg.main_location == .monocle) {
-                    main_w = usable_w;
-                    main_h = usable_h;
-
-                    sec_w = usable_w;
-                    sec_h = usable_h;
-                } else {
-                    if (sec_count > 0) {
-                        main_w = @as(u31, @intFromFloat(active_cfg.main_ratio * @as(f64, @floatFromInt(usable_w))));
-                        main_h = usable_h / main_count;
-                        main_h_rem = usable_h % main_count;
-
-                        sec_w = usable_w - main_w;
-                        sec_h = usable_h / sec_count;
-                        sec_h_rem = usable_h % sec_count;
-                    } else {
-                        main_w = usable_w;
-                        main_h = usable_h / main_count;
-                        main_h_rem = usable_h % main_count;
-                    }
-                }
-
-                var i: u31 = 0;
-                while (i < ev.view_count) : (i += 1) {
-                    var x: i32 = undefined;
-                    var y: i32 = undefined;
-                    var width: u31 = undefined;
-                    var height: u31 = undefined;
-
-                    if (active_cfg.main_location == .monocle) {
-                        x = 0;
-                        y = 0;
-                        width = main_w;
-                        height = main_h;
-                    } else {
-                        if (i < main_count) {
-                            x = 0;
-                            y = (i * main_h) + if (i > 0) cfg.inner_gaps + main_h_rem else 0;
-                            width = if (sec_count > 0) main_w - cfg.inner_gaps / 2 else main_w;
-                            height = (main_h + if (i == 0) main_h_rem else 0) -
-                                if (i > 0) cfg.inner_gaps else 0;
-                        } else {
-                            x = (main_w - cfg.inner_gaps / 2) + cfg.inner_gaps;
-                            y = (i - main_count) * sec_h +
-                                if (i > main_count) cfg.inner_gaps + sec_h_rem else 0;
-                            width = sec_w - cfg.inner_gaps / 2;
-                            height = (sec_h + if (i == main_count) sec_h_rem else 0) -
-                                if (i > main_count) cfg.inner_gaps else 0;
-                        }
-                    }
-
-                    switch (active_cfg.main_location) {
-                        .left => layout.pushViewDimensions(
-                            x +| cfg.outer_gaps,
-                            y +| cfg.outer_gaps,
-                            width,
-                            height,
-                            ev.serial,
-                        ),
-                        .right => layout.pushViewDimensions(
-                            usable_w - width -| x +| cfg.outer_gaps,
-                            y +| cfg.outer_gaps,
-                            width,
-                            height,
-                            ev.serial,
-                        ),
-                        .top => layout.pushViewDimensions(
-                            y +| cfg.outer_gaps,
-                            x +| cfg.outer_gaps,
-                            height,
-                            width,
-                            ev.serial,
-                        ),
-                        .bottom => layout.pushViewDimensions(
-                            y +| cfg.outer_gaps,
-                            usable_w - width -| x +| cfg.outer_gaps,
-                            height,
-                            width,
-                            ev.serial,
-                        ),
-                        .monocle => layout.pushViewDimensions(
-                            x +| cfg.outer_gaps,
-                            y +| cfg.outer_gaps,
-                            width,
-                            height,
-                            ev.serial,
-                        ),
-                    }
-                }
-
-                switch (active_cfg.main_location) {
-                    .left => layout.commit("left", ev.serial),
-                    .right => layout.commit("right", ev.serial),
-                    .top => layout.commit("top", ev.serial),
-                    .bottom => layout.commit("bottom", ev.serial),
-                    .monocle => layout.commit("monocle", ev.serial),
-                }
             },
         }
     }
 };
 
+fn handle_layout_demand(layout: *river.LayoutV3, view_count: u32, usable_width: u32, usable_height: u32, tags: u32, serial: u32) !void {
+    assert(view_count > 0);
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    var view_dimensions = try layout_config.layout(allocator, view_count, @as(u31, @truncate(usable_width)), @as(u31, @truncate(usable_height)), tags);
+
+    log.info("Proposing {} views:", .{view_dimensions.len});
+    for (view_dimensions) |dim| {
+        log.info("- {}+{} {}x{}", .{ dim.x, dim.y, dim.width, dim.height });
+        layout.pushViewDimensions(
+            dim.x,
+            dim.y,
+            dim.width,
+            dim.height,
+            serial,
+        );
+    }
+
+    layout.commit("", serial);
+}
+
 pub fn main() !void {
     const res = flags.parser([*:0]const u8, &.{
         .{ .name = "h", .kind = .boolean },
-        .{ .name = "version", .kind = .boolean },
+        .{ .name = "-version", .kind = .boolean },
         .{ .name = "no-smart-gaps", .kind = .boolean },
         .{ .name = "inner-gaps", .kind = .arg },
         .{ .name = "outer-gaps", .kind = .arg },
@@ -440,7 +314,7 @@ pub fn main() !void {
         try io.getStdOut().writeAll(usage);
         os.exit(0);
     }
-    if (res.flags.version) {
+    if (res.flags.@"-version") {
         try io.getStdOut().writeAll(build_options.version ++ "\n");
         os.exit(0);
     }

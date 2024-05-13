@@ -7,12 +7,12 @@ const mem = std.mem;
 
 const Scanner = @import("deps/zig-wayland/build.zig").Scanner;
 
-/// While a rivercarro release is in development, this string should contain
+/// While a river-ultitile release is in development, this string should contain
 /// the version in development with the "-dev" suffix.  When a release is
 /// tagged, the "-dev" suffix should be removed for the commit that gets tagged.
 /// Directly after the tagged commit, the version should be bumped and the "-dev"
 /// suffix added.
-const version = "0.3.0";
+const version = "0.1.0";
 
 pub fn build(b: *Builder) !void {
     const target = b.standardTargetOptions(.{});
@@ -58,7 +58,7 @@ pub fn build(b: *Builder) !void {
     scanner.generate("river_layout_manager_v3", 2);
 
     const exe = b.addExecutable(.{
-        .name = "rivercarro",
+        .name = "river-ultitile",
         .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
@@ -79,5 +79,5 @@ pub fn build(b: *Builder) !void {
     exe.pie = pie;
 
     b.installArtifact(exe);
-    b.installFile("doc/rivercarro.1", "share/man/man1/rivercarro.1");
+    b.installFile("doc/river-ultitile.1", "share/man/man1/river-ultitile.1");
 }

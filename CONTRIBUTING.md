@@ -25,13 +25,13 @@ A great guide to follow [here].
 ## Patches
 
 For patches send a [plain text] mail to my [public inbox]
-[~novakane/public-inbox@lists.sr.ht] with project prefix set to `rivercarro`:
+[~midgard/public-inbox@lists.sr.ht] with project prefix set to `river-ultitile`:
 
 You can configure your Git repo like so:
 
 ```bash
-git config sendemail.to "~novakane/public-inbox@lists.sr.ht"
-git config format.subjectPrefix "PATCH rivercarro"
+git config sendemail.to "~midgard/public-inbox@lists.sr.ht"
+git config format.subjectPrefix "PATCH river-ultitile"
 ```
 
 Questions or discussions works the same way, precise the project name in
@@ -151,8 +151,8 @@ these things though:
     ```
 
 [here]: https://gitlab.freedesktop.org/wayland/weston/-/blob/master/CONTRIBUTING.md#formatting-and-separating-commits
-[public inbox]: https://lists.sr.ht/~novakane/public-inbox
-[~novakane/public-inbox@lists.sr.ht]: mailto:~novakane/public-inbox@lists.sr.ht
+[public inbox]: https://lists.sr.ht/~midgard/public-inbox
+[~midgard/public-inbox@lists.sr.ht]: mailto:~midgard/public-inbox@lists.sr.ht
 [git send-email]: https://git-send-email.io
 [plain text email]: https://useplaintext.email/
 [git rebase]: https://git-rebase.io/
