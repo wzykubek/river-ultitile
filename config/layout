@@ -1,0 +1,28 @@
+#!/usr/bin/python3
+
+import sys
+
+
+def handle_line(line):
+	line = line.split(" ")
+	variables = dict(item.split("=") for item in line.split(" "))
+
+	view_count = int(variables["view_count"])
+	usable_width = int(variables["usable_width"])
+	usable_height = int(variables["usable_height"])
+	tags = int(variables["tags"])
+
+	if view_count == 1:
+		print("switch layout monocle")
+		return
+
+	if usable_width > 2500:
+		print("switch layout main-center")
+		return
+
+	print("switch layout main-left")
+
+if __name__ == "__main__":
+	for line in sys.stdin:
+		handle_line(line.rstrip("\n"))
+		sys.stdout.flush()

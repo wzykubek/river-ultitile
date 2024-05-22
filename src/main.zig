@@ -1,6 +1,7 @@
 // Layout generator for river <https://github.com/ifreund/river>
 //
 // Copyright 2021 Hugo Machet
+// Copyright 2024 Midgard
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -31,6 +32,7 @@ const wl = wayland.client.wl;
 const river = wayland.client.river;
 
 const layout_config = @import("./layout.zig");
+const config = @import("./config.zig");
 
 const log = std.log.scoped(.@"river-ultitile");
 
@@ -108,8 +110,10 @@ const Output = struct {
     }
 
     fn get_layout(output: *Output) !void {
+        // TODO Run once per named layout (and pass layout namespace)
         output.layout = try ctx.layout_manager.?.getLayout(output.wl_output, "river-ultitile");
         output.layout.setListener(*Output, layout_listener, output);
+        log.info("Bound river-ultitile to output {}\n", .{output.name});
     }
 
     fn layout_listener(layout: *river.LayoutV3, event: river.LayoutV3.Event, output: *Output) void {
@@ -269,13 +273,32 @@ const Output = struct {
 };
 
 fn handle_layout_demand(layout: *river.LayoutV3, view_count: u32, usable_width: u32, usable_height: u32, tags: u32, serial: u32) !void {
+    log.info("Got layout demand\n", .{});
     assert(view_count > 0);
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var allocator_instance = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer allocator_instance.deinit();
+    const allocator = allocator_instance.allocator();
 
-    var view_dimensions = try layout_config.layout(allocator, view_count, @as(u31, @truncate(usable_width)), @as(u31, @truncate(usable_height)), tags);
+    // TODO store a global LayoutSpecificationMap, accept commands and run init
+    _ = tags;
+    var layout_specifications = config.LayoutSpecificationMap.init(allocator);
+    defer config.deinitLayoutSpecificationMap(&layout_specifications);
+    (try config.executeCommand("new layout main-left type=hsplit padding=5", &layout_specifications)).ok;
+    (try config.executeCommand("new tile main-left.left type=vsplit stretch=40 order=2", &layout_specifications)).ok;
+    (try config.executeCommand("new tile main-left.main type=vsplit stretch=60 order=1 max-views=1", &layout_specifications)).ok;
+
+    (try config.executeCommand("new layout main-center type=hsplit stretch=1 padding=5", &layout_specifications)).ok;
+    (try config.executeCommand("new tile main-center.left type=vsplit stretch=25 order=2 suborder=0", &layout_specifications)).ok;
+    (try config.executeCommand("new tile main-center.main type=vsplit stretch=50 order=1 max-views=1", &layout_specifications)).ok;
+    (try config.executeCommand("new tile main-center.right type=vsplit stretch=25 order=2 suborder=1", &layout_specifications)).ok;
+
+    (try config.executeCommand("new layout monocle type=hsplit stretch=1 order=1 max-views=1", &layout_specifications)).ok;
+
+    const root_tile = layout_specifications.get("main-center").?;
+
+    var view_dimensions = try layout_config.layout(allocator, root_tile, view_count, @as(u31, @truncate(usable_width)), @as(u31, @truncate(usable_height)));
+    defer allocator.free(view_dimensions);
 
     log.info("Proposing {} views:", .{view_dimensions.len});
     for (view_dimensions) |dim| {
