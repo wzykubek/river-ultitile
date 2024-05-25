@@ -22,6 +22,8 @@ pub const Tile = struct {
     // min_size: u32,
     /// Padding between contents (px)
     padding: ?u31,
+    /// Margin around tile (px)
+    margin: u32,
 
     order: u32,
     suborder: u32,
@@ -38,6 +40,7 @@ pub const Tile = struct {
 
             .stretch = 1,
             .padding = null,
+            .margin = 0,
 
             .order = 0,
             .suborder = 0,
@@ -272,6 +275,14 @@ fn parseLayoutOptions(parts: *StringTokenIterator, tile: *Tile, edit: bool) Resu
                     else => unreachable,
                 };
             }
+        } else if (std.mem.eql(u8, option_name, "margin")) {
+            const value = option_int orelse return Result{ .err = "Couldn't parse margin value as positive integer" };
+            tile.margin = switch (operation) {
+                '=' => value,
+                '-' => tile.margin -| value,
+                '+' => tile.margin +| value,
+                else => unreachable,
+            };
         } else if (std.mem.eql(u8, option_name, "order")) {
             const value = option_int orelse return Result{ .err = "Couldn't parse order value as positive integer" };
             tile.order = switch (operation) {
@@ -318,7 +329,7 @@ test {
     defer cfg.deinit();
     var layout_specifications = &cfg.layout_specifications;
 
-    const result1 = try cfg.executeCommand("new layout main-left type=hsplit padding=5");
+    const result1 = try cfg.executeCommand("new layout main-left type=hsplit padding=5 margin=7");
     try std.testing.expectEqual(Result{ .ok = {} }, result1);
     const result2 = try cfg.executeCommand("new tile main-left.left type=vsplit stretch=25 order=2");
     try std.testing.expectEqual(Result{ .ok = {} }, result2);
@@ -335,6 +346,7 @@ test {
     try std.testing.expectEqual(TileType.hsplit, mainleft_root.typ);
     try std.testing.expectEqual(@as(u32, 1), mainleft_root.stretch);
     try std.testing.expectEqual(@as(?u31, 5), mainleft_root.padding);
+    try std.testing.expectEqual(@as(?u31, 7), mainleft_root.margin);
     try std.testing.expectEqual(@as(?u31, 0), mainleft_root.max_views);
 
     try std.testing.expectEqual(@as(usize, 2), mainleft_root.subtiles.items.len);

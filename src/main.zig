@@ -127,13 +127,15 @@ fn handle_layout_demand(layout_proto: *river.LayoutV3, output: *Output, view_cou
 }
 
 pub fn main() !void {
-    (try cfg.executeCommand("new layout hstack type=hsplit padding=5")).ok;
+    (try cfg.executeCommand("new layout hstack type=hsplit padding=5 margin=5 max-views=unlimited")).ok;
 
-    (try cfg.executeCommand("new layout main-left type=hsplit padding=5")).ok;
+    (try cfg.executeCommand("new layout vstack type=vsplit padding=5 margin=5 max-views=unlimited")).ok;
+
+    (try cfg.executeCommand("new layout main-left type=hsplit padding=5 margin=5")).ok;
     (try cfg.executeCommand("new tile main-left.left type=vsplit stretch=40 order=2")).ok;
     (try cfg.executeCommand("new tile main-left.main type=vsplit stretch=60 order=1 max-views=1")).ok;
 
-    (try cfg.executeCommand("new layout main-center type=hsplit padding=5")).ok;
+    (try cfg.executeCommand("new layout main-center type=hsplit padding=5 margin=5")).ok;
     (try cfg.executeCommand("new tile main-center.left type=vsplit stretch=25 order=2 suborder=0")).ok;
     (try cfg.executeCommand("new tile main-center.main type=vsplit stretch=50 order=1 max-views=1")).ok;
     (try cfg.executeCommand("new tile main-center.right type=vsplit stretch=25 order=2 suborder=1")).ok;

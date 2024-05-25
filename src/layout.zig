@@ -373,7 +373,7 @@ test "determineAmountViewsPerTile 7" {
     try testDetermineAmountViewsPerTile(std.testing.allocator, 7, expected_views_itemss, 7, 2, 2);
 }
 
-fn subtileDimensions(stretch: u32, stretch_before: u32, stretch_total: u32, elements_before: u32, elements_total: u32, padding: u31, parent_tile_info: *TileInfo) Dimensions {
+fn subtileDimensions(stretch: u32, stretch_before: u32, stretch_total: u32, elements_before: u32, elements_total: u32, padding: u31, margin: u32, parent_tile_info: *TileInfo) Dimensions {
     const parent_tile = parent_tile_info.tile;
     // The parent's dimensions must have been initialized already
     const parent_dimensions = parent_tile_info.dimensions.?;
@@ -396,31 +396,33 @@ fn subtileDimensions(stretch: u32, stretch_before: u32, stretch_total: u32, elem
     const parent_size_without_padding: f32 = @floatFromInt(parent_size - padding * (elements_total - 1));
 
     const padding_before: i32 = @intCast(padding * elements_before);
-    const own_before: i32 = @intFromFloat(stretch_before_f / stretch_total_f * parent_size_without_padding);
-    const before: i32 = parent_before + padding_before + own_before;
+    const before_from_elements: i32 = @intFromFloat(stretch_before_f / stretch_total_f * parent_size_without_padding);
+    const before: i32 = parent_before + padding_before + before_from_elements + @as(i32, @intCast(margin));
 
-    const size: u32 = if (elements_before + 1 < elements_total) @intFromFloat(stretch_f / stretch_total_f * parent_size_without_padding) else
-    // Make things line up pixel-perfect
-    parent_size - @as(u32, @intCast(padding_before + own_before));
+    const size: u32 = (
+        if (elements_before + 1 < elements_total) @intFromFloat(stretch_f / stretch_total_f * parent_size_without_padding) else
+        // Make things line up pixel-perfect
+        parent_size - @as(u32, @intCast(padding_before + before_from_elements))
+    ) - margin * 2;
 
     return switch (parent_tile.typ) {
         .hsplit => Dimensions{
             .x = before,
-            .y = parent_dimensions.y,
+            .y = parent_dimensions.y + margin,
             .width = size,
-            .height = parent_dimensions.height,
+            .height = parent_dimensions.height - margin * 2,
         },
         .vsplit => Dimensions{
-            .x = parent_dimensions.x,
+            .x = parent_dimensions.x + margin,
             .y = before,
-            .width = parent_dimensions.width,
+            .width = parent_dimensions.width - margin * 2,
             .height = size,
         },
         .overlay => Dimensions{
-            .x = parent_dimensions.x,
-            .y = parent_dimensions.y,
-            .width = parent_dimensions.width,
-            .height = parent_dimensions.height,
+            .x = parent_dimensions.x + margin,
+            .y = parent_dimensions.y + margin,
+            .width = parent_dimensions.width - margin * 2,
+            .height = parent_dimensions.height - margin * 2,
         },
     };
 }
@@ -446,12 +448,12 @@ fn determineViewSubtileDimensions(tile_info: *TileInfo) !void {
     var elements_before: u32 = 0;
     const padding = determinePadding(tile_info);
     for (tile_info.subtiles) |subtile| {
-        subtile.dimensions = subtileDimensions(subtile.tile.stretch, stretch_before, stretch_total, elements_before, elements_total, padding, tile_info);
+        subtile.dimensions = subtileDimensions(subtile.tile.stretch, stretch_before, stretch_total, elements_before, elements_total, padding, subtile.tile.margin, tile_info);
         stretch_before += subtile.tile.stretch;
         elements_before += 1;
     }
     for (0..tile_info.views) |i| {
-        views_dimensions[i] = subtileDimensions(VIEW_STRETCH, stretch_before, stretch_total, elements_before, elements_total, padding, tile_info);
+        views_dimensions[i] = subtileDimensions(VIEW_STRETCH, stretch_before, stretch_total, elements_before, elements_total, padding, 0, tile_info);
         stretch_before += VIEW_STRETCH;
         elements_before += 1;
     }
@@ -489,10 +491,10 @@ pub fn layout(allocator: std.mem.Allocator, root_tile: *Tile, view_count: u32, u
 
     var root_tile_info = &tile_infos.tile_infos[0];
     root_tile_info.dimensions = Dimensions{
-        .x = 0,
-        .y = 0,
-        .width = usable_width,
-        .height = usable_height,
+        .x = @intCast(root_tile.margin),
+        .y = @intCast(root_tile.margin),
+        .width = usable_width - 2 * root_tile.margin,
+        .height = usable_height - 2 * root_tile.margin,
     };
     try determineViewSubtileDimensions(root_tile_info);
 
