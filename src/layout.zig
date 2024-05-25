@@ -401,7 +401,7 @@ fn subtileDimensions(stretch: u32, stretch_before: u32, stretch_total: u32, elem
 
     const size: u32 = if (elements_before + 1 < elements_total) @intFromFloat(stretch_f / stretch_total_f * parent_size_without_padding) else
     // Make things line up pixel-perfect
-    parent_size - @as(u32, @intCast(before));
+    parent_size - @as(u32, @intCast(padding_before + own_before));
 
     return switch (parent_tile.typ) {
         .hsplit => Dimensions{
