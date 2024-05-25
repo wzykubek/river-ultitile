@@ -20,10 +20,7 @@ const build_options = @import("build_options");
 
 const std = @import("std");
 const assert = std.debug.assert;
-const fmt = std.fmt;
-const io = std.io;
 const mem = std.mem;
-const math = std.math;
 const os = std.os;
 
 const flags = @import("flags");
@@ -31,8 +28,9 @@ const wayland = @import("wayland");
 const wl = wayland.client.wl;
 const river = wayland.client.river;
 
-const layout_config = @import("./layout.zig");
+const layout = @import("./layout.zig");
 const config = @import("./config.zig");
+const util = @import("./util.zig");
 
 const log = std.log.scoped(.@"river-ultitile");
 
@@ -48,66 +46,22 @@ const usage =
     \\
 ;
 
-const Command = enum {
-    @"inner-gaps",
-    @"outer-gaps",
-    gaps,
-    @"main-location",
-    @"main-location-cycle",
-    @"main-count",
-    @"main-ratio",
-    @"width-ratio",
-};
-
-const Location = enum {
-    top,
-    right,
-    bottom,
-    left,
-    monocle,
-};
-
-const Config = struct {
-    smart_gaps: bool = true,
-    inner_gaps: u31 = 6,
-    outer_gaps: u31 = 6,
-    main_location: Location = .left,
-    main_count: u31 = 1,
-    main_ratio: f64 = 0.6,
-    width_ratio: f64 = 1.0,
-    per_tag: bool = false,
-};
-
 const Context = struct {
     layout_manager: ?*river.LayoutManagerV3 = null,
     outputs: std.SinglyLinkedList(Output) = .{},
     initialized: bool = false,
 };
 
-var cfg: Config = .{};
 var ctx: Context = .{};
+var cfg = config.Config.init(gpa);
 
 const Output = struct {
     wl_output: *wl.Output,
     name: u32,
 
-    cfgs: std.AutoHashMapUnmanaged(u32, Config) = .{},
-    user_command_tags: u32 = 0,
-
     layout: *river.LayoutV3 = undefined,
 
-    fn get_cfg(output: *Output, tags: u32) *Config {
-        const default_cfg = output.cfgs.getPtr(0) orelse unreachable;
-        if (!cfg.per_tag) return default_cfg;
-
-        // default to global config
-        const entry = output.cfgs.getOrPutValue(gpa, tags, default_cfg.*) catch {
-            // 0 always has a value
-            log.err("out of memory, reverting to default cfg", .{});
-            return default_cfg;
-        };
-        return entry.value_ptr;
-    }
+    tags: u32,
 
     fn get_layout(output: *Output) !void {
         // TODO Run once per named layout (and pass layout namespace)
@@ -116,154 +70,27 @@ const Output = struct {
         log.info("Bound river-ultitile to output {}\n", .{output.name});
     }
 
-    fn layout_listener(layout: *river.LayoutV3, event: river.LayoutV3.Event, output: *Output) void {
+    fn layout_listener(layout_proto: *river.LayoutV3, event: river.LayoutV3.Event, output: *Output) void {
         switch (event) {
             .namespace_in_use => fatal("namespace 'river-ultitile' already in use.", .{}),
 
             .user_command => |ev| {
-                var it = mem.tokenize(u8, mem.span(ev.command), " ");
-                const active_cfg = output.get_cfg(output.user_command_tags);
-                const raw_cmd = it.next() orelse {
-                    log.err("not enough arguments", .{});
-                    return;
+                const command = mem.span(ev.command);
+                const result = cfg.executeCommand(command) catch |err| switch (err) {
+                    error.OutOfMemory => fatal("out of memory", .{}),
                 };
-                const raw_arg = it.next() orelse {
-                    log.err("not enough arguments", .{});
-                    return;
-                };
-                if (it.next() != null) {
-                    log.err("too many arguments", .{});
-                    return;
-                }
-                const cmd = std.meta.stringToEnum(Command, raw_cmd) orelse {
-                    log.err("unknown command: {s}", .{raw_cmd});
-                    return;
-                };
-                switch (cmd) {
-                    .@"inner-gaps" => {
-                        const arg = fmt.parseInt(i32, raw_arg, 10) catch |err| {
-                            log.err("failed to parse argument: {}", .{err});
-                            return;
-                        };
-                        switch (raw_arg[0]) {
-                            '+' => active_cfg.inner_gaps +|= @intCast(arg),
-                            '-' => {
-                                const res = active_cfg.inner_gaps +| arg;
-                                if (res >= 0) active_cfg.inner_gaps = @intCast(res);
-                            },
-                            else => active_cfg.inner_gaps = @intCast(arg),
-                        }
-                    },
-                    .@"outer-gaps" => {
-                        const arg = fmt.parseInt(i32, raw_arg, 10) catch |err| {
-                            log.err("failed to parse argument: {}", .{err});
-                            return;
-                        };
-                        switch (raw_arg[0]) {
-                            '+' => active_cfg.outer_gaps +|= @intCast(arg),
-                            '-' => {
-                                const res = active_cfg.outer_gaps +| arg;
-                                if (res >= 0) active_cfg.outer_gaps = @intCast(res);
-                            },
-                            else => active_cfg.outer_gaps = @intCast(arg),
-                        }
-                    },
-                    .gaps => {
-                        const arg = fmt.parseInt(i32, raw_arg, 10) catch |err| {
-                            log.err("failed to parse argument: {}", .{err});
-                            return;
-                        };
-                        switch (raw_arg[0]) {
-                            '+' => {
-                                active_cfg.inner_gaps +|= @intCast(arg);
-                                active_cfg.outer_gaps +|= @intCast(arg);
-                            },
-                            '-' => {
-                                const o = active_cfg.outer_gaps +| arg;
-                                const i = active_cfg.inner_gaps +| arg;
-                                if (i >= 0) active_cfg.inner_gaps = @intCast(i);
-                                if (o >= 0) active_cfg.outer_gaps = @intCast(o);
-                            },
-                            else => {
-                                active_cfg.inner_gaps = @intCast(arg);
-                                active_cfg.outer_gaps = @intCast(arg);
-                            },
-                        }
-                    },
-                    .@"main-location" => {
-                        active_cfg.main_location = std.meta.stringToEnum(Location, raw_arg) orelse {
-                            log.err("unknown location: {s}", .{raw_arg});
-                            return;
-                        };
-                    },
-                    .@"main-location-cycle" => {
-                        var loc_it = mem.splitSequence(u8, raw_arg, ",");
-                        // select the first one, then the one after the current
-                        var picked: ?Location = null;
-                        var pick_next: bool = false;
-                        while (loc_it.next()) |loc| {
-                            const current = std.meta.stringToEnum(Location, loc) orelse {
-                                log.err("unknown location: {s}", .{loc});
-                                return;
-                            };
-                            if (picked == null or pick_next) {
-                                picked = current;
-                                if (pick_next) break;
-                            }
-                            if (current == active_cfg.main_location) {
-                                pick_next = true;
-                            }
-                        }
-                        active_cfg.main_location = picked.?;
-                    },
-                    .@"main-count" => {
-                        const arg = fmt.parseInt(i32, raw_arg, 10) catch |err| {
-                            log.err("failed to parse argument: {}", .{err});
-                            return;
-                        };
-                        switch (raw_arg[0]) {
-                            '+' => active_cfg.main_count +|= @intCast(arg),
-                            '-' => {
-                                const res = active_cfg.main_count +| arg;
-                                if (res >= 1) active_cfg.main_count = @intCast(res);
-                            },
-                            else => {
-                                if (arg >= 1) active_cfg.main_count = @intCast(arg);
-                            },
-                        }
-                    },
-                    .@"main-ratio" => {
-                        const arg = fmt.parseFloat(f64, raw_arg) catch |err| {
-                            log.err("failed to parse argument: {}", .{err});
-                            return;
-                        };
-                        switch (raw_arg[0]) {
-                            '+', '-' => {
-                                active_cfg.main_ratio = math.clamp(active_cfg.main_ratio + arg, 0.1, 0.9);
-                            },
-                            else => active_cfg.main_ratio = math.clamp(arg, 0.1, 0.9),
-                        }
-                    },
-                    .@"width-ratio" => {
-                        const arg = fmt.parseFloat(f64, raw_arg) catch |err| {
-                            log.err("failed to parse argument: {}", .{err});
-                            return;
-                        };
-                        switch (raw_arg[0]) {
-                            '+', '-' => {
-                                active_cfg.width_ratio = math.clamp(active_cfg.width_ratio + arg, 0.1, 1.0);
-                            },
-                            else => active_cfg.width_ratio = math.clamp(arg, 0.1, 1.0),
-                        }
-                    },
+                switch (result) {
+                    .ok => {},
+                    .err => |err| fatal("error executing command '{s}': {s}", .{ command, err }),
                 }
             },
             .user_command_tags => |ev| {
-                output.user_command_tags = ev.tags;
+                output.tags = ev.tags;
             },
 
             .layout_demand => |ev| {
-                handle_layout_demand(layout, ev.view_count, ev.usable_width, ev.usable_height, ev.tags, ev.serial) catch |err| {
+                output.tags = ev.tags;
+                handle_layout_demand(layout_proto, output, ev.view_count, ev.usable_width, ev.usable_height, ev.serial) catch |err| {
                     log.err("failed to handle layout demand: {}", .{err});
                     return;
                 };
@@ -272,7 +99,7 @@ const Output = struct {
     }
 };
 
-fn handle_layout_demand(layout: *river.LayoutV3, view_count: u32, usable_width: u32, usable_height: u32, tags: u32, serial: u32) !void {
+fn handle_layout_demand(layout_proto: *river.LayoutV3, output: *Output, view_count: u32, usable_width: u32, usable_height: u32, serial: u32) !void {
     log.info("Got layout demand\n", .{});
     assert(view_count > 0);
 
@@ -280,30 +107,14 @@ fn handle_layout_demand(layout: *river.LayoutV3, view_count: u32, usable_width: 
     defer allocator_instance.deinit();
     const allocator = allocator_instance.allocator();
 
-    // TODO store a global LayoutSpecificationMap, accept commands and run init
-    _ = tags;
-    var layout_specifications = config.LayoutSpecificationMap.init(allocator);
-    defer config.deinitLayoutSpecificationMap(&layout_specifications);
-    (try config.executeCommand("new layout main-left type=hsplit padding=5", &layout_specifications)).ok;
-    (try config.executeCommand("new tile main-left.left type=vsplit stretch=40 order=2", &layout_specifications)).ok;
-    (try config.executeCommand("new tile main-left.main type=vsplit stretch=60 order=1 max-views=1", &layout_specifications)).ok;
+    const root_tile = cfg.getLayoutSpecification(output.name) orelse cfg.getDefaultLayoutSpecification() orelse return error.NoLayouts;
 
-    (try config.executeCommand("new layout main-center type=hsplit stretch=1 padding=5", &layout_specifications)).ok;
-    (try config.executeCommand("new tile main-center.left type=vsplit stretch=25 order=2 suborder=0", &layout_specifications)).ok;
-    (try config.executeCommand("new tile main-center.main type=vsplit stretch=50 order=1 max-views=1", &layout_specifications)).ok;
-    (try config.executeCommand("new tile main-center.right type=vsplit stretch=25 order=2 suborder=1", &layout_specifications)).ok;
-
-    (try config.executeCommand("new layout monocle type=hsplit stretch=1 order=1 max-views=1", &layout_specifications)).ok;
-
-    const root_tile = layout_specifications.get("main-center").?;
-
-    var view_dimensions = try layout_config.layout(allocator, root_tile, view_count, @as(u31, @truncate(usable_width)), @as(u31, @truncate(usable_height)));
-    defer allocator.free(view_dimensions);
+    var view_dimensions = try layout.layout(allocator, root_tile, view_count, @as(u31, @truncate(usable_width)), @as(u31, @truncate(usable_height)));
 
     log.info("Proposing {} views:", .{view_dimensions.len});
     for (view_dimensions) |dim| {
         log.info("- {}+{} {}x{}", .{ dim.x, dim.y, dim.width, dim.height });
-        layout.pushViewDimensions(
+        layout_proto.pushViewDimensions(
             dim.x,
             dim.y,
             dim.width,
@@ -312,21 +123,31 @@ fn handle_layout_demand(layout: *river.LayoutV3, view_count: u32, usable_width: 
         );
     }
 
-    layout.commit("", serial);
+    const name_sentinel = try util.sliceToSentinelPtr(allocator, u8, 0, root_tile.name);
+    layout_proto.commit(name_sentinel, serial);
 }
 
 pub fn main() !void {
+    (try cfg.executeCommand("new layout hstack type=hsplit padding=5")).ok;
+
+    (try cfg.executeCommand("new layout main-left type=hsplit padding=5")).ok;
+    (try cfg.executeCommand("new tile main-left.left type=vsplit stretch=40 order=2")).ok;
+    (try cfg.executeCommand("new tile main-left.main type=vsplit stretch=60 order=1 max-views=1")).ok;
+
+    (try cfg.executeCommand("new layout main-center type=hsplit padding=5")).ok;
+    (try cfg.executeCommand("new tile main-center.left type=vsplit stretch=25 order=2 suborder=0")).ok;
+    (try cfg.executeCommand("new tile main-center.main type=vsplit stretch=50 order=1 max-views=1")).ok;
+    (try cfg.executeCommand("new tile main-center.right type=vsplit stretch=25 order=2 suborder=1")).ok;
+
+    (try cfg.executeCommand("new layout monocle type=hsplit max-views=1")).ok;
+
+    (try cfg.executeCommand("default layout main-center")).ok;
+
+    // TODO ensure that a default layout has been set after init file has been read
+
     const res = flags.parser([*:0]const u8, &.{
         .{ .name = "h", .kind = .boolean },
         .{ .name = "-version", .kind = .boolean },
-        .{ .name = "no-smart-gaps", .kind = .boolean },
-        .{ .name = "inner-gaps", .kind = .arg },
-        .{ .name = "outer-gaps", .kind = .arg },
-        .{ .name = "main-location", .kind = .arg },
-        .{ .name = "main-count", .kind = .arg },
-        .{ .name = "main-ratio", .kind = .arg },
-        .{ .name = "width-ratio", .kind = .arg },
-        .{ .name = "per-tag", .kind = .boolean },
     }).parse(os.argv[1..]) catch {
         try std.io.getStdErr().writeAll(usage);
         os.exit(1);
@@ -334,49 +155,13 @@ pub fn main() !void {
     if (res.args.len != 0) fatal_usage("Unknown option '{s}'", .{res.args[0]});
 
     if (res.flags.h) {
-        try io.getStdOut().writeAll(usage);
+        try std.io.getStdOut().writeAll(usage);
         os.exit(0);
     }
     if (res.flags.@"-version") {
-        try io.getStdOut().writeAll(build_options.version ++ "\n");
+        try std.io.getStdOut().writeAll(build_options.version ++ "\n");
         os.exit(0);
     }
-    if (res.flags.@"no-smart-gaps") {
-        cfg.smart_gaps = false;
-    }
-    if (res.flags.@"inner-gaps") |raw| {
-        cfg.inner_gaps = fmt.parseUnsigned(u31, raw, 10) catch
-            fatal_usage("Invalid value '{s}' provided to -inner-gaps", .{raw});
-    }
-    if (res.flags.@"outer-gaps") |raw| {
-        cfg.outer_gaps = fmt.parseUnsigned(u31, raw, 10) catch
-            fatal_usage("Invalid value '{s}' provided to -outer-gaps", .{raw});
-    }
-    if (res.flags.@"main-location") |raw| {
-        cfg.main_location = std.meta.stringToEnum(Location, raw) orelse
-            fatal_usage("Invalid value '{s}' provided to -main-location", .{raw});
-    }
-    if (res.flags.@"main-count") |raw| {
-        cfg.main_count = fmt.parseUnsigned(u31, raw, 10) catch
-            fatal_usage("Invalid value '{s}' provided to -main-count", .{raw});
-    }
-    if (res.flags.@"main-ratio") |raw| {
-        cfg.main_ratio = fmt.parseFloat(f64, raw) catch {
-            fatal_usage("Invalid value '{s}' provided to -main-ratio", .{raw});
-        };
-        if (cfg.main_ratio < 0.1 or cfg.main_ratio > 0.9) {
-            fatal_usage("Invalid value '{s}' provided to -main-ratio", .{raw});
-        }
-    }
-    if (res.flags.@"width-ratio") |raw| {
-        cfg.width_ratio = fmt.parseFloat(f64, raw) catch {
-            fatal_usage("Invalid value '{s}' provided to -width-ratio", .{raw});
-        };
-        if (cfg.width_ratio < 0.1 or cfg.width_ratio > 1.0) {
-            fatal_usage("Invalid value '{s}' provided to -width-ratio", .{raw});
-        }
-    }
-    if (res.flags.@"per-tag") cfg.per_tag = true;
 
     const display = wl.Display.connect(null) catch {
         fatal("unable to connect to wayland compositor", .{});
@@ -436,8 +221,8 @@ fn registry_event(context: *Context, registry: *wl.Registry, event: wl.Registry.
                 node.data = .{
                     .wl_output = wl_output,
                     .name = ev.name,
+                    .tags = 0,
                 };
-                try node.data.cfgs.put(gpa, 0, cfg);
 
                 if (ctx.initialized) try node.data.get_layout();
                 context.outputs.prepend(node);
@@ -449,7 +234,7 @@ fn registry_event(context: *Context, registry: *wl.Registry, event: wl.Registry.
                 if (node.data.name == ev.name) {
                     node.data.wl_output.release();
                     node.data.layout.destroy();
-                    node.data.cfgs.deinit(gpa);
+                    _ = cfg.output__active_layout_specification__map.remove(node.data.name);
                     context.outputs.remove(node);
                     gpa.destroy(node);
                     break;

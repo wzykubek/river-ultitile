@@ -22,3 +22,10 @@ test {
     try std.testing.expectEqualDeep(.{ "a", "bb", "c" }, slice);
     std.testing.allocator.free(slice);
 }
+
+/// Caller owns returned memory
+pub fn sliceToSentinelPtr(allocator: std.mem.Allocator, comptime T: type, comptime sentinel: T, slice: []const T) ![:sentinel]T {
+    var result: [:sentinel]T = try allocator.allocSentinel(T, slice.len + 1, sentinel);
+    @memcpy(result[0..slice.len], slice);
+    return result;
+}
