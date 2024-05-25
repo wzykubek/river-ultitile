@@ -107,7 +107,7 @@ fn buildFillingInfoInner(allocator: std.mem.Allocator, tile: *const Tile, parent
 }
 
 fn buildFillingInfo(allocator: std.mem.Allocator, tile: *const Tile) !TileInfos {
-    var order_suborder_map = try allocator.alloc([]?*TileInfo, highestOrder(tile) + 1);
+    const order_suborder_map = try allocator.alloc([]?*TileInfo, highestOrder(tile) + 1);
     const highest_suborder = highestSuborder(tile);
     for (order_suborder_map) |*suborder_map| {
         suborder_map.* = try allocator.alloc(?*TileInfo, highest_suborder + 1);
@@ -400,7 +400,7 @@ fn subtileDimensions(stretch: u32, stretch_before: u32, stretch_total: u32, elem
     const before: i32 = parent_before + padding_before + before_from_elements + @as(i32, @intCast(margin));
 
     const size: u32 = (
-        if (elements_before + 1 < elements_total) @intFromFloat(stretch_f / stretch_total_f * parent_size_without_padding) else
+        if (elements_before + 1 < elements_total) @as(u32, @intFromFloat(stretch_f / stretch_total_f * parent_size_without_padding)) else
         // Make things line up pixel-perfect
         parent_size - @as(u32, @intCast(padding_before + before_from_elements))
     ) - margin * 2;
@@ -408,19 +408,19 @@ fn subtileDimensions(stretch: u32, stretch_before: u32, stretch_total: u32, elem
     return switch (parent_tile.typ) {
         .hsplit => Dimensions{
             .x = before,
-            .y = parent_dimensions.y + margin,
+            .y = parent_dimensions.y + @as(i32, @intCast(margin)),
             .width = size,
             .height = parent_dimensions.height - margin * 2,
         },
         .vsplit => Dimensions{
-            .x = parent_dimensions.x + margin,
+            .x = parent_dimensions.x + @as(i32, @intCast(margin)),
             .y = before,
             .width = parent_dimensions.width - margin * 2,
             .height = size,
         },
         .overlay => Dimensions{
-            .x = parent_dimensions.x + margin,
-            .y = parent_dimensions.y + margin,
+            .x = parent_dimensions.x + @as(i32, @intCast(margin)),
+            .y = parent_dimensions.y + @as(i32, @intCast(margin)),
             .width = parent_dimensions.width - margin * 2,
             .height = parent_dimensions.height - margin * 2,
         },

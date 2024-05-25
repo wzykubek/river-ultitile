@@ -21,7 +21,6 @@ const build_options = @import("build_options");
 const std = @import("std");
 const assert = std.debug.assert;
 const mem = std.mem;
-const os = std.os;
 
 const flags = @import("flags");
 const wayland = @import("wayland");
@@ -108,7 +107,7 @@ fn handle_layout_demand(layout_proto: *river.LayoutV3, output: *Output, view_cou
 
     const root_tile = cfg.getLayoutSpecification(output.name) orelse cfg.getDefaultLayoutSpecification() orelse return error.NoLayouts;
 
-    var view_dimensions = try layout.layout(allocator, root_tile, view_count, @as(u31, @truncate(usable_width)), @as(u31, @truncate(usable_height)));
+    const view_dimensions = try layout.layout(allocator, root_tile, view_count, @as(u31, @truncate(usable_width)), @as(u31, @truncate(usable_height)));
 
     log.info("Proposing {} views:", .{view_dimensions.len});
     for (view_dimensions) |dim| {
@@ -149,19 +148,19 @@ pub fn main() !void {
     const res = flags.parser([*:0]const u8, &.{
         .{ .name = "h", .kind = .boolean },
         .{ .name = "-version", .kind = .boolean },
-    }).parse(os.argv[1..]) catch {
+    }).parse(std.os.argv[1..]) catch {
         try std.io.getStdErr().writeAll(usage);
-        os.exit(1);
+        std.posix.exit(1);
     };
     if (res.args.len != 0) fatal_usage("Unknown option '{s}'", .{res.args[0]});
 
     if (res.flags.h) {
         try std.io.getStdOut().writeAll(usage);
-        os.exit(0);
+        std.posix.exit(0);
     }
     if (res.flags.@"-version") {
         try std.io.getStdOut().writeAll(build_options.version ++ "\n");
-        os.exit(0);
+        std.posix.exit(0);
     }
 
     const display = wl.Display.connect(null) catch {
@@ -247,11 +246,11 @@ fn registry_event(context: *Context, registry: *wl.Registry, event: wl.Registry.
 
 fn fatal(comptime format: []const u8, args: anytype) noreturn {
     log.err(format, args);
-    os.exit(1);
+    std.posix.exit(1);
 }
 
 fn fatal_usage(comptime format: []const u8, args: anytype) noreturn {
     log.err(format, args);
     std.io.getStdErr().writeAll(usage) catch {};
-    os.exit(1);
+    std.posix.exit(1);
 }

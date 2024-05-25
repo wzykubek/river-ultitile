@@ -7,12 +7,8 @@ hsplits, and a filling pattern to decide the order in which views should be assi
 
 ## Building
 
-Same requirements as **[river]**, use [zig] 0.11. If **[river]** and
-_rivertile_ works on your machine you shouldn't have any problems.
-
-Init submodules:
-
-    git submodule update --init
+Same requirements as **[river]**, use [zig] 0.12, if **[river]** and
+_rivertile_ work on your machine you shouldn't have any problems.
 
 Build, `e.g.`
 

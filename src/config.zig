@@ -113,7 +113,7 @@ pub const Config = struct {
 
     pub fn executeCommand(self: *Config, command: []const u8) !Result {
         var parts: StringTokenIterator = std.mem.tokenizeScalar(u8, command, ' ');
-        var part = parts.next() orelse return Result{ .err = "Empty command" };
+        const part = parts.next() orelse return Result{ .err = "Empty command" };
 
         if (std.mem.eql(u8, part, "new")) {
             return executeCommandNew(&parts, &self.layout_specifications);
@@ -137,7 +137,7 @@ pub const Config = struct {
 };
 
 fn executeCommandNew(parts: *StringTokenIterator, layout_specifications: *LayoutSpecificationMap) !Result {
-    var part = parts.next() orelse return Result{ .err = "Premature end of command after 'new'" };
+    const part = parts.next() orelse return Result{ .err = "Premature end of command after 'new'" };
 
     if (std.mem.eql(u8, part, "layout")) {
         return executeCommandNewLayout(parts, layout_specifications);
@@ -149,7 +149,7 @@ fn executeCommandNew(parts: *StringTokenIterator, layout_specifications: *Layout
 }
 
 fn executeCommandNewLayout(parts: *StringTokenIterator, layout_specifications: *LayoutSpecificationMap) !Result {
-    var layout_name = parts.next() orelse return Result{ .err = "Premature end of command after 'layout'" };
+    const layout_name = parts.next() orelse return Result{ .err = "Premature end of command after 'layout'" };
 
     if (std.mem.indexOfScalar(u8, layout_name, '.') != null) {
         return Result{ .err = "Layout name contains illegal character '.'" };
@@ -163,7 +163,7 @@ fn executeCommandNewLayout(parts: *StringTokenIterator, layout_specifications: *
         return Result{ .err = "Layout with this name already exists" };
     }
 
-    var tile = try layout_specifications.allocator.create(Tile);
+    const tile = try layout_specifications.allocator.create(Tile);
     errdefer layout_specifications.allocator.destroy(tile);
 
     tile.* = try Tile.init(layout_specifications.allocator, layout_name);
@@ -192,7 +192,7 @@ fn executeCommandNewTile(parts: *StringTokenIterator, layout_specifications: *La
         tile = tile.getSubtile(tile_name) orelse return Result{ .err = "Ancestor tile does not exist (create parent tiles first)" };
     }
     const tile_name = tile_name_parts[tile_name_parts.len - 1];
-    var subtile = tile.addSubtile(tile_name) catch |err| switch (err) {
+    const subtile = tile.addSubtile(tile_name) catch |err| switch (err) {
         error.TileAlreadyExists => return Result{ .err = "Tile exists already" },
         else => |leftover_err| return leftover_err,
     };
@@ -217,7 +217,7 @@ fn executeCommandEdit(parts: *StringTokenIterator, layout_specifications: *Layou
 }
 
 fn executeCommandDefault(parts: *StringTokenIterator, cfg: *Config) !Result {
-    var part = parts.next() orelse return Result{ .err = "Premature end of command after 'default'" };
+    const part = parts.next() orelse return Result{ .err = "Premature end of command after 'default'" };
 
     if (std.mem.eql(u8, part, "layout")) {
         return executeCommandDefaultLayout(parts, cfg);
@@ -227,7 +227,7 @@ fn executeCommandDefault(parts: *StringTokenIterator, cfg: *Config) !Result {
 }
 
 fn executeCommandDefaultLayout(parts: *StringTokenIterator, cfg: *Config) !Result {
-    var layout_name = parts.next() orelse return Result{ .err = "Premature end of command after 'layout'" };
+    const layout_name = parts.next() orelse return Result{ .err = "Premature end of command after 'layout'" };
 
     if (cfg.layout_specifications.getKeyPtr(layout_name)) |layout_name_ptr| {
         cfg.default_layout = layout_name_ptr;
@@ -239,12 +239,12 @@ fn executeCommandDefaultLayout(parts: *StringTokenIterator, cfg: *Config) !Resul
 
 fn parseLayoutOptions(parts: *StringTokenIterator, tile: *Tile, edit: bool) Result {
     while (parts.next()) |part| {
-        var operation_pos = std.mem.lastIndexOfAny(u8, part, "=-+") orelse return Result{ .err = "Missing '=', '+' or '-' in option" };
+        const operation_pos = std.mem.lastIndexOfAny(u8, part, "=-+") orelse return Result{ .err = "Missing '=', '+' or '-' in option" };
         const option_name = part[0..operation_pos];
         const option_value = part[operation_pos + 1 ..];
         const operation = part[operation_pos];
         if (!edit and operation != '=') return Result{ .err = "New tiles and layouts only support '=' options" };
-        var option_int: ?u31 = std.fmt.parseInt(u31, option_value, 10) catch null;
+        const option_int: ?u31 = std.fmt.parseInt(u31, option_value, 10) catch null;
 
         if (std.mem.eql(u8, option_name, "type")) {
             if (operation != '=') return Result{ .err = "Tile type only supports '=', not '+' or '-'" };
