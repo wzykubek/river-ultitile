@@ -381,12 +381,12 @@ fn subtileDimensions(stretch: u32, stretch_before: u32, stretch_total: u32, elem
     const parent_before = switch (parent_tile.typ) {
         .hsplit => parent_dimensions.x,
         .vsplit => parent_dimensions.y,
-        .overlay => 0,
+        .overlay => parent_dimensions.x,
     };
     const parent_size = switch (parent_tile.typ) {
         .hsplit => parent_dimensions.width,
         .vsplit => parent_dimensions.height,
-        .overlay => 0,
+        .overlay => parent_dimensions.width,
     };
 
     const stretch_f: f32 = @floatFromInt(stretch);
@@ -399,7 +399,9 @@ fn subtileDimensions(stretch: u32, stretch_before: u32, stretch_total: u32, elem
     const own_before: i32 = @intFromFloat(stretch_before_f / stretch_total_f * parent_size_without_padding);
     const before: i32 = parent_before + padding_before + own_before;
 
-    const size: u32 = @intFromFloat(stretch_f / stretch_total_f * parent_size_without_padding);
+    const size: u32 = if (elements_before + 1 < elements_total) @intFromFloat(stretch_f / stretch_total_f * parent_size_without_padding) else
+    // Make things line up pixel-perfect
+    parent_size - @as(u32, @intCast(before));
 
     return switch (parent_tile.typ) {
         .hsplit => Dimensions{
