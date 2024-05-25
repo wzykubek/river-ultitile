@@ -47,7 +47,7 @@ e.g.  `[river-ultitile] How do I do this?`
 
 ## Coding style
 
-Follow the [zig style guide](https://ziglang.org/documentation/0.8.0/#Style-Guide).
+Follow the [Zig style guide](https://ziglang.org/documentation/0.8.0/#Style-Guide).
 
 [here]: https://gitlab.freedesktop.org/wayland/weston/-/blob/master/CONTRIBUTING.md#formatting-and-separating-commits
 [public inbox]: https://lists.sr.ht/~midgard/public-inbox

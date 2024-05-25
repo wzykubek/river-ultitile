@@ -1,6 +1,9 @@
 const std = @import("std");
 const util = @import("./util.zig");
 
+/// The stretch value used for views and as default for tiles
+pub const default_stretch: u32 = 100;
+
 pub const TileType = enum {
     hsplit,
     vsplit,
@@ -38,7 +41,7 @@ pub const Tile = struct {
             .typ = .hsplit,
             .name = try allocator.dupe(u8, name),
 
-            .stretch = 1,
+            .stretch = default_stretch,
             .padding = null,
             .margin = 0,
 

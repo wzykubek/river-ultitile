@@ -4,14 +4,13 @@ const util = @import("./util.zig");
 const config = @import("./config.zig");
 const Tile = config.Tile;
 
+pub const view_stretch = config.default_stretch;
+
 // Tiling works as follows:
 // first, views are assigned to buckets according to tile order (lowest first), with each bucket
 // having the capacity of the sum of the associated tiles' capacities;
 // within each bucket, tiles are attempted to be distributed evenly, with lower suborders getting
 // earlier views
-
-/// The stretch value used for views
-pub const VIEW_STRETCH: u32 = 100;
 
 pub const Dimensions = struct {
     x: i32,
@@ -441,7 +440,7 @@ fn determineViewSubtileDimensions(tile_info: *TileInfo) !void {
     var views_dimensions = try tile_info.allocator.alloc(Dimensions, tile_info.views);
     tile_info.views_dimensions = views_dimensions;
 
-    var stretch_total: u32 = tile_info.views * VIEW_STRETCH;
+    var stretch_total: u32 = tile_info.views * view_stretch;
     for (tile_info.tile.subtiles.items) |*subtile| stretch_total += subtile.stretch;
     const elements_total = tile_info.views + @as(u32, @intCast(tile_info.tile.subtiles.items.len));
     var stretch_before: u32 = 0;
@@ -453,8 +452,8 @@ fn determineViewSubtileDimensions(tile_info: *TileInfo) !void {
         elements_before += 1;
     }
     for (0..tile_info.views) |i| {
-        views_dimensions[i] = subtileDimensions(VIEW_STRETCH, stretch_before, stretch_total, elements_before, elements_total, padding, 0, tile_info);
-        stretch_before += VIEW_STRETCH;
+        views_dimensions[i] = subtileDimensions(view_stretch, stretch_before, stretch_total, elements_before, elements_total, padding, 0, tile_info);
+        stretch_before += view_stretch;
         elements_before += 1;
     }
     for (tile_info.subtiles) |subtile| {
