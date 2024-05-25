@@ -256,8 +256,8 @@ fn parseLayoutOptions(parts: *StringTokenIterator, tile: *Tile, edit: bool) Resu
             const value = option_int orelse return Result{ .err = "Couldn't parse stretch value as positive integer" };
             tile.stretch = switch (operation) {
                 '=' => value,
-                '-' => tile.stretch - value,
-                '+' => tile.stretch + value,
+                '-' => tile.stretch -| value,
+                '+' => tile.stretch +| value,
                 else => unreachable,
             };
         } else if (std.mem.eql(u8, option_name, "padding")) {
@@ -267,8 +267,8 @@ fn parseLayoutOptions(parts: *StringTokenIterator, tile: *Tile, edit: bool) Resu
                 const value = option_int orelse return Result{ .err = "Couldn't parse padding value as positive integer" };
                 tile.padding = switch (operation) {
                     '=' => value,
-                    '-' => (tile.padding orelse return Result{ .err = "padding is inherit, can't subtract" }) - value,
-                    '+' => (tile.padding orelse return Result{ .err = "padding is inherit, can't add" }) + value,
+                    '-' => (tile.padding orelse return Result{ .err = "padding is inherit, can't subtract" }) -| value,
+                    '+' => (tile.padding orelse return Result{ .err = "padding is inherit, can't add" }) +| value,
                     else => unreachable,
                 };
             }
@@ -276,8 +276,8 @@ fn parseLayoutOptions(parts: *StringTokenIterator, tile: *Tile, edit: bool) Resu
             const value = option_int orelse return Result{ .err = "Couldn't parse order value as positive integer" };
             tile.order = switch (operation) {
                 '=' => value,
-                '-' => tile.order - value,
-                '+' => tile.order + value,
+                '-' => tile.order -| value,
+                '+' => tile.order +| value,
                 else => unreachable,
             };
             // If tiling order is being set, the user wants this tile to hold views. We set
@@ -289,8 +289,8 @@ fn parseLayoutOptions(parts: *StringTokenIterator, tile: *Tile, edit: bool) Resu
             const value = option_int orelse return Result{ .err = "Couldn't parse suborder value as positive integer" };
             tile.suborder = switch (operation) {
                 '=' => value,
-                '-' => tile.suborder - value,
-                '+' => tile.suborder + value,
+                '-' => tile.suborder -| value,
+                '+' => tile.suborder +| value,
                 else => unreachable,
             };
             if (tile.max_views) |max_views| {
@@ -303,8 +303,8 @@ fn parseLayoutOptions(parts: *StringTokenIterator, tile: *Tile, edit: bool) Resu
                 const value = option_int orelse return Result{ .err = "Couldn't parse max-views value as positive integer" };
                 tile.max_views = switch (operation) {
                     '=' => value,
-                    '-' => (tile.max_views orelse return Result{ .err = "max-views is unlimited, can't subtract" }) - value,
-                    '+' => (tile.max_views orelse return Result{ .err = "max-views is unlimited, can't add" }) + value,
+                    '-' => (tile.max_views orelse return Result{ .err = "max-views is unlimited, can't subtract" }) -| value,
+                    '+' => (tile.max_views orelse return Result{ .err = "max-views is unlimited, can't add" }) +| value,
                     else => unreachable,
                 };
             }
