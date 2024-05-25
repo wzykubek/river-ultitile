@@ -1,10 +1,10 @@
 const std = @import("std");
-const assert = std.debug.assert;
 const util = @import("./util.zig");
 
 pub const TileType = enum {
     hsplit,
     vsplit,
+    overlay,
 };
 
 pub const Tile = struct {
@@ -228,7 +228,9 @@ fn parseLayoutOptions(parts: *StringTokenIterator, tile: *Tile) Result {
                 tile.typ = TileType.hsplit;
             } else if (std.mem.eql(u8, option_value, "vsplit")) {
                 tile.typ = TileType.vsplit;
-            } else return Result{ .err = "Unrecognized tile type (expecting one of 'hsplit', 'vsplit')" };
+            } else if (std.mem.eql(u8, option_value, "overlay")) {
+                tile.typ = TileType.overlay;
+            } else return Result{ .err = "Unrecognized tile type (expecting one of 'hsplit', 'vsplit', 'overlay')" };
         } else if (std.mem.eql(u8, option_name, "stretch")) {
             tile.stretch = std.fmt.parseInt(u31, option_value, 10) catch
                 return Result{ .err = "Couldn't parse stretch value as positive integer" };

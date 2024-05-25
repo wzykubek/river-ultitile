@@ -381,10 +381,12 @@ fn subtileDimensions(stretch: u32, stretch_before: u32, stretch_total: u32, elem
     const parent_before = switch (parent_tile.typ) {
         .hsplit => parent_dimensions.x,
         .vsplit => parent_dimensions.y,
+        .overlay => 0,
     };
     const parent_size = switch (parent_tile.typ) {
         .hsplit => parent_dimensions.width,
         .vsplit => parent_dimensions.height,
+        .overlay => 0,
     };
 
     const stretch_f: f32 = @floatFromInt(stretch);
@@ -411,6 +413,12 @@ fn subtileDimensions(stretch: u32, stretch_before: u32, stretch_total: u32, elem
             .y = before,
             .width = parent_dimensions.width,
             .height = size,
+        },
+        .overlay => Dimensions{
+            .x = parent_dimensions.x,
+            .y = parent_dimensions.y,
+            .width = parent_dimensions.width,
+            .height = parent_dimensions.height,
         },
     };
 }
@@ -465,7 +473,8 @@ fn determineViewDimensions(allocator: std.mem.Allocator, view_count: u32, tile_i
             }
         };
     }
-    std.debug.assert(i == view_count);
+    std.debug.assert(i <= view_count);
+    view_dimensions = try allocator.realloc(view_dimensions, i);
 
     return view_dimensions;
 }

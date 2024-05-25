@@ -81,7 +81,7 @@ const Output = struct {
                 };
                 switch (result) {
                     .ok => {},
-                    .err => |err| fatal("error executing command '{s}': {s}", .{ command, err }),
+                    .err => |err| log.err("error executing command '{s}': {s}", .{ command, err }),
                 }
             },
             .user_command_tags => |ev| {
@@ -139,7 +139,7 @@ pub fn main() !void {
     (try cfg.executeCommand("new tile main-center.main type=vsplit stretch=50 order=1 max-views=1")).ok;
     (try cfg.executeCommand("new tile main-center.right type=vsplit stretch=25 order=2 suborder=1")).ok;
 
-    (try cfg.executeCommand("new layout monocle type=hsplit max-views=1")).ok;
+    (try cfg.executeCommand("new layout monocle type=overlay max-views=unlimited")).ok;
 
     (try cfg.executeCommand("default layout main-center")).ok;
 
