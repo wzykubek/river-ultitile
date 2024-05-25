@@ -164,7 +164,7 @@ fn executeCommandNewLayout(parts: *StringTokenIterator, layout_specifications: *
     errdefer layout_specifications.allocator.destroy(tile);
 
     tile.* = try Tile.init(layout_specifications.allocator, layout_name);
-    switch (parseLayoutOptions(parts, tile)) {
+    switch (parseLayoutOptions(parts, tile, false)) {
         .err => |err| return Result{ .err = err },
         .ok => {},
     }
@@ -194,7 +194,7 @@ fn executeCommandNewTile(parts: *StringTokenIterator, layout_specifications: *La
         else => |leftover_err| return leftover_err,
     };
 
-    return parseLayoutOptions(parts, subtile);
+    return parseLayoutOptions(parts, subtile, false);
 }
 
 fn executeCommandEdit(parts: *StringTokenIterator, layout_specifications: *LayoutSpecificationMap) !Result {
@@ -210,7 +210,7 @@ fn executeCommandEdit(parts: *StringTokenIterator, layout_specifications: *Layou
         tile = tile.getSubtile(tile_name) orelse return Result{ .err = "Tile does not exist" };
     }
 
-    return parseLayoutOptions(parts, tile);
+    return parseLayoutOptions(parts, tile, true);
 }
 
 fn executeCommandDefault(parts: *StringTokenIterator, cfg: *Config) !Result {
@@ -234,14 +234,17 @@ fn executeCommandDefaultLayout(parts: *StringTokenIterator, cfg: *Config) !Resul
     }
 }
 
-fn parseLayoutOptions(parts: *StringTokenIterator, tile: *Tile) Result {
+fn parseLayoutOptions(parts: *StringTokenIterator, tile: *Tile, edit: bool) Result {
     while (parts.next()) |part| {
-        var option_parts = std.mem.tokenizeScalar(u8, part, '=');
-        const option_name = option_parts.next().?;
-        const option_value = option_parts.next() orelse return Result{ .err = "Missing option value" };
-        if (option_parts.next() != null) return Result{ .err = "Spurious '=' in option" };
+        var operation_pos = std.mem.lastIndexOfAny(u8, part, "=-+") orelse return Result{ .err = "Missing '=', '+' or '-' in option" };
+        const option_name = part[0..operation_pos];
+        const option_value = part[operation_pos + 1 ..];
+        const operation = part[operation_pos];
+        if (!edit and operation != '=') return Result{ .err = "New tiles and layouts only support '=' options" };
+        var option_int: ?u31 = std.fmt.parseInt(u31, option_value, 10) catch null;
 
         if (std.mem.eql(u8, option_name, "type")) {
+            if (operation != '=') return Result{ .err = "Tile type only supports '=', not '+' or '-'" };
             if (std.mem.eql(u8, option_value, "hsplit")) {
                 tile.typ = TileType.hsplit;
             } else if (std.mem.eql(u8, option_value, "vsplit")) {
@@ -250,32 +253,60 @@ fn parseLayoutOptions(parts: *StringTokenIterator, tile: *Tile) Result {
                 tile.typ = TileType.overlay;
             } else return Result{ .err = "Unrecognized tile type (expecting one of 'hsplit', 'vsplit', 'overlay')" };
         } else if (std.mem.eql(u8, option_name, "stretch")) {
-            tile.stretch = std.fmt.parseInt(u31, option_value, 10) catch
-                return Result{ .err = "Couldn't parse stretch value as positive integer" };
+            const value = option_int orelse return Result{ .err = "Couldn't parse stretch value as positive integer" };
+            tile.stretch = switch (operation) {
+                '=' => value,
+                '-' => tile.stretch - value,
+                '+' => tile.stretch + value,
+                else => unreachable,
+            };
         } else if (std.mem.eql(u8, option_name, "padding")) {
             if (std.mem.eql(u8, option_value, "inherit")) {
                 tile.padding = null;
             } else {
-                tile.padding = std.fmt.parseInt(u31, option_value, 10) catch
-                    return Result{ .err = "Couldn't parse max-views value as positive integer or 'inherit'" };
+                const value = option_int orelse return Result{ .err = "Couldn't parse padding value as positive integer" };
+                tile.padding = switch (operation) {
+                    '=' => value,
+                    '-' => (tile.padding orelse return Result{ .err = "padding is inherit, can't subtract" }) - value,
+                    '+' => (tile.padding orelse return Result{ .err = "padding is inherit, can't add" }) + value,
+                    else => unreachable,
+                };
             }
         } else if (std.mem.eql(u8, option_name, "order")) {
-            tile.order = std.fmt.parseInt(u31, option_value, 10) catch
-                return Result{ .err = "Couldn't parse order value as positive integer" };
+            const value = option_int orelse return Result{ .err = "Couldn't parse order value as positive integer" };
+            tile.order = switch (operation) {
+                '=' => value,
+                '-' => tile.order - value,
+                '+' => tile.order + value,
+                else => unreachable,
+            };
             // If tiling order is being set, the user wants this tile to hold views. We set
             // max-views to unlimited here so the user doesn't have to
             if (tile.max_views) |max_views| {
                 if (max_views == 0) tile.max_views = null;
             }
         } else if (std.mem.eql(u8, option_name, "suborder")) {
-            tile.suborder = std.fmt.parseInt(u31, option_value, 10) catch
-                return Result{ .err = "Couldn't parse suborder value as positive integer" };
+            const value = option_int orelse return Result{ .err = "Couldn't parse suborder value as positive integer" };
+            tile.suborder = switch (operation) {
+                '=' => value,
+                '-' => tile.suborder - value,
+                '+' => tile.suborder + value,
+                else => unreachable,
+            };
+            if (tile.max_views) |max_views| {
+                if (max_views == 0) tile.max_views = null;
+            }
         } else if (std.mem.eql(u8, option_name, "max-views")) {
             if (std.mem.eql(u8, option_value, "unlimited")) {
                 tile.max_views = null;
             } else {
-                tile.max_views = std.fmt.parseInt(u31, option_value, 10) catch
-                    return Result{ .err = "Couldn't parse max-views value as positive integer or 'unlimited'" };
+                const value = option_int orelse return Result{ .err = "Couldn't parse max-views value as positive integer" };
+                tile.max_views = switch (operation) {
+                    '=' => value,
+                    '-' => (tile.max_views orelse return Result{ .err = "max-views is unlimited, can't subtract" }) - value,
+                    '+' => (tile.max_views orelse return Result{ .err = "max-views is unlimited, can't add" }) + value,
+                    else => unreachable,
+                };
             }
         } else return Result{ .err = "Unrecognized option" };
     }
@@ -326,4 +357,11 @@ test {
     try std.testing.expectEqual(@as(?u31, 1), mainleft_submain.max_views);
     try std.testing.expectEqual(@as(u32, 1), mainleft_submain.order);
     try std.testing.expectEqual(@as(u32, 1), mainleft_submain.suborder);
+
+    const result7 = try cfg.executeCommand("edit main-left.main stretch+25 order+2 suborder-2 max-views+1");
+    try std.testing.expectEqual(Result{ .ok = {} }, result7);
+    try std.testing.expectEqual(@as(u32, 50), mainleft_main.stretch);
+    try std.testing.expectEqual(@as(?u31, 2), mainleft_main.max_views);
+    try std.testing.expectEqual(@as(u32, 3), mainleft_main.order);
+    try std.testing.expectEqual(@as(u32, 0), mainleft_main.suborder);
 }
