@@ -1,3 +1,6 @@
+// river-ultitile <https://sr.ht/~midgard/river-ultitile>
+// See main.zig and COPYING for copyright info
+
 const std = @import("std");
 
 pub const ResultTag = enum { ok, err };

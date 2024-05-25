@@ -1,3 +1,4 @@
+// river-ultitile <https://sr.ht/~midgard/river-ultitile>
 // Layout generator for river <https://github.com/ifreund/river>
 //
 // Copyright 2021 Hugo Machet
