@@ -100,7 +100,6 @@ const Output = struct {
 };
 
 fn handle_layout_demand(layout_proto: *river.LayoutV3, output: *Output, view_count: u32, usable_width: u32, usable_height: u32, serial: u32) !void {
-    log.info("Got layout demand\n", .{});
     assert(view_count > 0);
 
     var allocator_instance = std.heap.ArenaAllocator.init(std.heap.page_allocator);

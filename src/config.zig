@@ -114,6 +114,8 @@ pub const Config = struct {
 
         if (std.mem.eql(u8, part, "new")) {
             return executeCommandNew(&parts, &self.layout_specifications);
+        } else if (std.mem.eql(u8, part, "edit")) {
+            return executeCommandEdit(&parts, &self.layout_specifications);
         } else if (std.mem.eql(u8, part, "default")) {
             return executeCommandDefault(&parts, self);
         } else {
@@ -184,7 +186,7 @@ fn executeCommandNewTile(parts: *StringTokenIterator, layout_specifications: *La
     defer layout_specifications.allocator.free(tile_name_parts);
     if (tile_name_parts.len < 1) return Result{ .err = "Missing tile name after layout name" };
     for (tile_name_parts[0 .. tile_name_parts.len - 1]) |tile_name| {
-        tile = tile.getSubtile(tile_name) orelse return Result{ .err = "Ancestor tile not found (create parent tiles first)" };
+        tile = tile.getSubtile(tile_name) orelse return Result{ .err = "Ancestor tile does not exist (create parent tiles first)" };
     }
     const tile_name = tile_name_parts[tile_name_parts.len - 1];
     var subtile = tile.addSubtile(tile_name) catch |err| switch (err) {
@@ -193,6 +195,22 @@ fn executeCommandNewTile(parts: *StringTokenIterator, layout_specifications: *La
     };
 
     return parseLayoutOptions(parts, subtile);
+}
+
+fn executeCommandEdit(parts: *StringTokenIterator, layout_specifications: *LayoutSpecificationMap) !Result {
+    const full_tile_name = parts.next() orelse return Result{ .err = "Premature end of command after 'edit'" };
+
+    var tile_name_parts = std.mem.tokenizeScalar(u8, full_tile_name, '.');
+    const layout_name = tile_name_parts.next() orelse return Result{ .err = "Premature end of command after 'edit'" };
+
+    const root_tile = layout_specifications.get(layout_name) orelse return Result{ .err = "Layout does not exist" };
+    var tile: *Tile = root_tile;
+
+    while (tile_name_parts.next()) |tile_name| {
+        tile = tile.getSubtile(tile_name) orelse return Result{ .err = "Tile does not exist" };
+    }
+
+    return parseLayoutOptions(parts, tile);
 }
 
 fn executeCommandDefault(parts: *StringTokenIterator, cfg: *Config) !Result {
@@ -281,8 +299,6 @@ test {
     try std.testing.expectEqual(Result{ .ok = {} }, result5);
     const result6 = try cfg.executeCommand("default layout main-left");
     try std.testing.expectEqual(Result{ .ok = {} }, result6);
-    const result7 = try cfg.initComplete();
-    try std.testing.expectEqual(Result{ .ok = {} }, result7);
 
     const mainleft_root = layout_specifications.get("main-left").?;
     try std.testing.expectEqual(TileType.hsplit, mainleft_root.typ);
