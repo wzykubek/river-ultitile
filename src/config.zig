@@ -298,7 +298,7 @@ fn parseLayoutOptions(parts: *StringTokenIterator, tile: *Tile, edit: bool) Resu
                 else => unreachable,
             };
             // If tiling order is being set, the user wants this tile to hold views. We set
-            // max-views to unlimited here so the user doesn't have to
+            // max_views to unlimited here so the user doesn't have to
             if (tile.max_views) |max_views| {
                 if (max_views == 0) tile.max_views = null;
             }
@@ -313,15 +313,15 @@ fn parseLayoutOptions(parts: *StringTokenIterator, tile: *Tile, edit: bool) Resu
             if (tile.max_views) |max_views| {
                 if (max_views == 0) tile.max_views = null;
             }
-        } else if (std.mem.eql(u8, option_name, "max-views")) {
+        } else if (std.mem.eql(u8, option_name, "max_views")) {
             if (std.mem.eql(u8, option_value, "unlimited")) {
                 tile.max_views = null;
             } else {
-                const value = option_int orelse return Result{ .err = "Couldn't parse max-views value as positive integer" };
+                const value = option_int orelse return Result{ .err = "Couldn't parse max_views value as positive integer" };
                 tile.max_views = switch (operation) {
                     '=' => value,
-                    '-' => (tile.max_views orelse return Result{ .err = "max-views is unlimited, can't subtract" }) -| value,
-                    '+' => (tile.max_views orelse return Result{ .err = "max-views is unlimited, can't add" }) +| value,
+                    '-' => (tile.max_views orelse return Result{ .err = "max_views is unlimited, can't subtract" }) -| value,
+                    '+' => (tile.max_views orelse return Result{ .err = "max_views is unlimited, can't add" }) +| value,
                     else => unreachable,
                 };
             }
@@ -339,11 +339,11 @@ test {
     try std.testing.expectEqual(Result{ .ok = {} }, result1);
     const result2 = try cfg.executeCommand("new tile main-left.left type=vsplit stretch=25 order=2");
     try std.testing.expectEqual(Result{ .ok = {} }, result2);
-    const result3 = try cfg.executeCommand("new tile main-left.main type=vsplit stretch=25 order=1 suborder=2 max-views=1");
+    const result3 = try cfg.executeCommand("new tile main-left.main type=vsplit stretch=25 order=1 suborder=2 max_views=1");
     try std.testing.expectEqual(Result{ .ok = {} }, result3);
     const result4 = try cfg.executeCommand("new tile main-left.main");
     try std.testing.expectEqualStrings("Tile exists already", result4.err);
-    const result5 = try cfg.executeCommand("new tile main-left.main.submain order=1 suborder=1 max-views=1");
+    const result5 = try cfg.executeCommand("new tile main-left.main.submain order=1 suborder=1 max_views=1");
     try std.testing.expectEqual(Result{ .ok = {} }, result5);
     const result6 = try cfg.executeCommand("default layout main-left");
     try std.testing.expectEqual(Result{ .ok = {} }, result6);
@@ -376,7 +376,7 @@ test {
     try std.testing.expectEqual(@as(u32, 1), mainleft_submain.order);
     try std.testing.expectEqual(@as(u32, 1), mainleft_submain.suborder);
 
-    const result7 = try cfg.executeCommand("edit main-left.main stretch+25 order+2 suborder-2 max-views+1");
+    const result7 = try cfg.executeCommand("edit main-left.main stretch+25 order+2 suborder-2 max_views+1");
     try std.testing.expectEqual(Result{ .ok = {} }, result7);
     try std.testing.expectEqual(@as(u32, 50), mainleft_main.stretch);
     try std.testing.expectEqual(@as(?u31, 2), mainleft_main.max_views);
