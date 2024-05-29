@@ -21,7 +21,7 @@ In your **river** init (usually `$XDG_CONFIG_HOME/river/init`), start river-ulti
 Configuration happens by sending commands to a running river-ultitile instance. With these commands
 you build a grid of nested tiles, which can be nested arbitrarily deep. Certain tiles should be
 designated to hold views; this can be done by either setting an `order` (as explained below) or
-setting their `max_views` to `unlimited` or a non-zero number.
+setting their `max-views` to `unlimited` or a non-zero number.
 
 Tiles can have their contents arranged horizontally (`type=hsplit`), vertically
 (`type=vsplit`), or superimposed (`type=overlay`).
@@ -30,7 +30,7 @@ Views are assigned to tiles in an order determined by the `order` property of th
 assignment of views starts with the lower orders, so lower orders get the views on the top of the
 river view stack. Tiles with the same `order` will share the assigned views evenly. Use `suborder`
 to determine views higher on the stack will come. Having tiles with the same `order` and `suborder`
-and a non-zero `max_views` is not allowed.
+and a non-zero `max-views` is not allowed.
 
 Per-output or per-tag configuration is not yet possible.
 
@@ -47,11 +47,11 @@ Tile properties are:
 - `stretch=<number>` (default `100`): a relative width specifier. The stretches of a tile's
     subtiles are summed, and the subtiles get a width proportional to their stretch divided by that
     sum. Views always have a stretch of 100.
-- `order=<number>` (default `0`): see above. Setting `order` also sets `max_views=unlimited` if
-    `max_views` is `0`.
-- `suborder=<number>` (default `0`): see above. Setting `suborder` also sets `max_views=unlimited`
-    if `max_views` is `0`.
-- `max_views=<number|unlimited>` (default `0`): the maximum amount of views that will be assigned
+- `order=<number>` (default `0`): see above. Setting `order` also sets `max-views=unlimited` if
+    `max-views` is `0`.
+- `suborder=<number>` (default `0`): see above. Setting `suborder` also sets `max-views=unlimited`
+    if `max-views` is `0`.
+- `max-views=<number|unlimited>` (default `0`): the maximum amount of views that will be assigned
 
 ```bash
 riverctl map normal $mod K focus-view previous
@@ -67,18 +67,18 @@ river-ultitile &
 ultitile() {
 	riverctl send-layout-command river-ultitile "$*"
 }
-ultitile new layout hstack type=hsplit padding=5 margin=5 max_views=unlimited
+ultitile new layout hstack type=hsplit padding=5 margin=5 max-views=unlimited
 
 ultitile new layout main-left type=hsplit padding=5 margin=5
 ultitile new tile main-left.left type=vsplit stretch=40 order=1
-ultitile new tile main-left.main type=vsplit stretch=60 order=0 max_views=1
+ultitile new tile main-left.main type=vsplit stretch=60 order=0 max-views=1
 
 ultitile new layout main-center type=hsplit padding=5 margin=5
 ultitile new tile main-center.left type=vsplit stretch=25 order=1 suborder=0
-ultitile new tile main-center.main type=vsplit stretch=50 order=0 max_views=1
+ultitile new tile main-center.main type=vsplit stretch=50 order=0 max-views=1
 ultitile new tile main-center.right type=vsplit stretch=25 order=1 suborder=1
 
-ultitile new layout monocle type=overlay max_views=unlimited
+ultitile new layout monocle type=overlay max-views=unlimited
 
 ultitile default layout main-center
 
@@ -87,8 +87,8 @@ riverctl map normal $mod U send-layout-cmd river-ultitile "edit main-center.main
 riverctl map normal $mod I send-layout-cmd river-ultitile "edit main-center.main stretch-5"
 
 # Mod+Shift+U and Mod+Shift+I to decrease/increase the main count
-riverctl map normal $mod+Shift U send-layout-cmd river-ultitile "edit main-center.main max_views-1"
-riverctl map normal $mod+Shift I send-layout-cmd river-ultitile "edit main-center.main max_views+1"
+riverctl map normal $mod+Shift U send-layout-cmd river-ultitile "edit main-center.main max-views-1"
+riverctl map normal $mod+Shift I send-layout-cmd river-ultitile "edit main-center.main max-views+1"
 ```
 
 ## Contributing
