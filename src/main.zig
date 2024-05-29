@@ -28,9 +28,9 @@ const wayland = @import("wayland");
 const wl = wayland.client.wl;
 const river = wayland.client.river;
 
-const layout = @import("./layout.zig");
-const config = @import("./config.zig");
-const util = @import("./util.zig");
+const layout = @import("layout.zig");
+const config = @import("config.zig");
+const util = @import("util.zig");
 
 const log = std.log.scoped(.@"river-ultitile");
 
@@ -63,14 +63,14 @@ const Output = struct {
 
     tags: u32,
 
-    fn get_layout(output: *Output) !void {
+    fn getLayout(output: *Output) !void {
         // TODO Run once per named layout (and pass layout namespace)
         output.layout = try ctx.layout_manager.?.getLayout(output.wl_output, "river-ultitile");
-        output.layout.setListener(*Output, layout_listener, output);
+        output.layout.setListener(*Output, layoutListener, output);
         log.info("Bound river-ultitile to output {}\n", .{output.name});
     }
 
-    fn layout_listener(layout_proto: *river.LayoutV3, event: river.LayoutV3.Event, output: *Output) void {
+    fn layoutListener(layout_proto: *river.LayoutV3, event: river.LayoutV3.Event, output: *Output) void {
         switch (event) {
             .namespace_in_use => fatal("namespace 'river-ultitile' already in use.", .{}),
 
@@ -90,7 +90,7 @@ const Output = struct {
 
             .layout_demand => |ev| {
                 output.tags = ev.tags;
-                handle_layout_demand(layout_proto, output, ev.view_count, ev.usable_width, ev.usable_height, ev.serial) catch |err| {
+                handleLayoutDemand(layout_proto, output, ev.view_count, ev.usable_width, ev.usable_height, ev.serial) catch |err| {
                     log.err("failed to handle layout demand: {}", .{err});
                     return;
                 };
@@ -99,7 +99,7 @@ const Output = struct {
     }
 };
 
-fn handle_layout_demand(layout_proto: *river.LayoutV3, output: *Output, view_count: u32, usable_width: u32, usable_height: u32, serial: u32) !void {
+fn handleLayoutDemand(layout_proto: *river.LayoutV3, output: *Output, view_count: u32, usable_width: u32, usable_height: u32, serial: u32) !void {
     assert(view_count > 0);
 
     var allocator_instance = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -134,7 +134,7 @@ pub fn main() !void {
         try std.io.getStdErr().writeAll(usage);
         std.posix.exit(1);
     };
-    if (res.args.len != 0) fatal_usage("Unknown option '{s}'", .{res.args[0]});
+    if (res.args.len != 0) fatalUsage("Unknown option '{s}'", .{res.args[0]});
 
     if (res.flags.h) {
         try std.io.getStdOut().writeAll(usage);
@@ -152,7 +152,7 @@ pub fn main() !void {
 
     const registry = try display.getRegistry();
     defer registry.destroy();
-    registry.setListener(*Context, registry_listener, &ctx);
+    registry.setListener(*Context, registryListener, &ctx);
 
     const errno = display.roundtrip();
     if (errno != .SUCCESS) {
@@ -167,7 +167,7 @@ pub fn main() !void {
 
     var it = ctx.outputs.first;
     while (it) |node| : (it = node.next) {
-        try node.data.get_layout();
+        try node.data.getLayout();
     }
 
     while (true) {
@@ -178,8 +178,8 @@ pub fn main() !void {
     }
 }
 
-fn registry_listener(registry: *wl.Registry, event: wl.Registry.Event, context: *Context) void {
-    registry_event(context, registry, event) catch |err| switch (err) {
+fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *Context) void {
+    registryEvent(context, registry, event) catch |err| switch (err) {
         error.OutOfMemory => {
             log.err("out of memory", .{});
             return;
@@ -188,7 +188,7 @@ fn registry_listener(registry: *wl.Registry, event: wl.Registry.Event, context: 
     };
 }
 
-fn registry_event(context: *Context, registry: *wl.Registry, event: wl.Registry.Event) !void {
+fn registryEvent(context: *Context, registry: *wl.Registry, event: wl.Registry.Event) !void {
     switch (event) {
         .global => |ev| {
             if (mem.orderZ(u8, ev.interface, river.LayoutManagerV3.getInterface().name) == .eq) {
@@ -206,7 +206,7 @@ fn registry_event(context: *Context, registry: *wl.Registry, event: wl.Registry.
                     .tags = 0,
                 };
 
-                if (ctx.initialized) try node.data.get_layout();
+                if (ctx.initialized) try node.data.getLayout();
                 context.outputs.prepend(node);
             }
         },
@@ -231,7 +231,7 @@ fn fatal(comptime format: []const u8, args: anytype) noreturn {
     std.posix.exit(1);
 }
 
-fn fatal_usage(comptime format: []const u8, args: anytype) noreturn {
+fn fatalUsage(comptime format: []const u8, args: anytype) noreturn {
     log.err(format, args);
     std.io.getStdErr().writeAll(usage) catch {};
     std.posix.exit(1);

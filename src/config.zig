@@ -2,7 +2,7 @@
 // See main.zig and COPYING for copyright info
 
 const std = @import("std");
-const util = @import("./util.zig");
+const util = @import("util.zig");
 
 /// The stretch value used for views and as default for tiles
 pub const default_stretch: u32 = 100;

@@ -3,8 +3,8 @@
 
 const std = @import("std");
 
-const util = @import("./util.zig");
-const config = @import("./config.zig");
+const util = @import("util.zig");
+const config = @import("config.zig");
 const Tile = config.Tile;
 
 pub const view_stretch = config.default_stretch;
@@ -402,9 +402,11 @@ fn subtileDimensions(stretch: u32, stretch_before: u32, stretch_total: u32, elem
     const before: i32 = parent_before + padding_before + before_from_elements + @as(i32, @intCast(margin));
 
     const size: u32 = (
+    //
         if (elements_before + 1 < elements_total) @as(u32, @intFromFloat(stretch_f / stretch_total_f * parent_size_without_padding)) else
-        // Make things line up pixel-perfect
-        parent_size - @as(u32, @intCast(padding_before + before_from_elements))
+    // Make things line up pixel-perfect
+    parent_size - @as(u32, @intCast(padding_before + before_from_elements))
+    //
     ) - margin * 2;
 
     return switch (parent_tile.typ) {
