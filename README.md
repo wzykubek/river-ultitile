@@ -65,7 +65,7 @@ riverctl default-layout river-ultitile
 river-ultitile &
 
 ultitile() {
-	riverctl send-layout-command river-ultitile "$*"
+	riverctl send-layout-cmd river-ultitile "$*"
 }
 ultitile new layout hstack type=hsplit padding=5 margin=5 max-views=unlimited
 
