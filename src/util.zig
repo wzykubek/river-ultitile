@@ -22,7 +22,7 @@ pub fn tokenIteratorAsSlice(comptime T: type, comptime delim: std.mem.DelimiterT
 test {
     var token_iterator = std.mem.tokenizeScalar(u8, "a.bb.c", '.');
     const slice = try tokenIteratorAsSlice(u8, .scalar, std.testing.allocator, &token_iterator);
-    try std.testing.expectEqualDeep(.{ "a", "bb", "c" }, slice);
+    try std.testing.expectEqualDeep(&[_][]const u8{ "a", "bb", "c" }, slice);
     std.testing.allocator.free(slice);
 }
 
