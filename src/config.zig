@@ -64,11 +64,12 @@ pub const Tile = struct {
         self.subtiles.deinit();
     }
 
+    /// Does not take ownership of name
     pub fn addSubtile(self: *Tile, name: []const u8) !*Tile {
         if (self.getSubtile(name) != null) return error.TileAlreadyExists;
-        const subtile = try self.subtiles.addOne();
-        subtile.* = try Tile.init(self.allocator, name);
-        return subtile;
+        const subtile_ptr = try self.subtiles.addOne();
+        subtile_ptr.* = try Tile.init(self.allocator, name);
+        return subtile_ptr;
     }
 
     pub fn getSubtile(self: *Tile, name: []const u8) ?*Tile {
@@ -82,304 +83,306 @@ pub const Tile = struct {
     }
 };
 
-pub const LayoutSpecificationMap = std.hash_map.StringHashMap(*Tile);
-
 pub const Result = util.Result(void, []const u8);
 
 const StringTokenIterator = std.mem.TokenIterator(u8, .scalar);
 
+/// Find the lowest tag that's set in a tag bitmask
+pub fn dominantTag(tags: u32) u32 {
+    const trailing_zeros = @ctz(tags);
+    if (trailing_zeros >= 32) return 0;
+    return @as(u32, 1) << @as(u5, @intCast(trailing_zeros));
+}
+
+pub const VarTag = enum {
+    integer,
+    string,
+    boolean,
+};
+pub const Var = union(VarTag) {
+    integer: i32,
+    string: []const u8,
+    boolean: bool,
+
+    fn deinit(self: *const Var, allocator: std.mem.Allocator) void {
+        switch (self.*) {
+            .string => |s| allocator.free(s),
+            else => {},
+        }
+    }
+};
+
+pub const Operator = enum {
+    @"=",
+    @"-=",
+    @"+=",
+    @"@",
+};
+
+pub const Variable = struct {
+    name: []const u8,
+    value: Var,
+    tag: ?u32,
+    output: ?u32,
+
+    pub fn deinit(self: *Variable, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+        self.value.deinit(allocator);
+    }
+};
+
+pub const VariablesHashMap = std.hash_map.StringHashMap(Var);
+pub const Variables = struct {
+    allocator: std.mem.Allocator,
+    data: std.SinglyLinkedList(Variable),
+
+    pub fn init(allocator: std.mem.Allocator) Variables {
+        return Variables{
+            .allocator = allocator,
+            .data = std.SinglyLinkedList(Variable){},
+        };
+    }
+
+    pub fn deinit(self: *Variables) void {
+        while (self.data.popFirst()) |node| {
+            node.data.deinit(self.allocator);
+            self.allocator.destroy(node);
+        }
+    }
+
+    pub fn get(self: *Variables, name: []const u8, tags: u32, output: u32) ?Var {
+        const tag = dominantTag(tags);
+        var max_specificity_found: u8 = 0;
+        var value_found: ?Var = null;
+        var maybe_node = self.data.first;
+        while (maybe_node) |node| : (maybe_node = node.next) {
+            const item = &node.data;
+            var specificity: u8 = 0;
+            if (item.output) |item_output| {
+                if (item_output != output) continue;
+                specificity |= 1 << 0;
+            }
+            if (item.tag) |item_tag| {
+                if (item_tag != tag) continue;
+                specificity |= 1 << 1;
+            }
+            if (specificity < max_specificity_found) continue;
+            if (!std.mem.eql(u8, item.name, name)) continue;
+            max_specificity_found = specificity;
+            value_found = item.value;
+        }
+        return value_found;
+    }
+
+    pub fn getString(self: *Variables, name: []const u8, tags: u32, output: u32) ?[]const u8 {
+        const maybe_variable = self.get(name, tags, output);
+        if (maybe_variable) |variable| {
+            return switch (variable) {
+                .string => |value| value,
+                else => null,
+            };
+        } else return null;
+    }
+
+    pub fn getInteger(self: *Variables, name: []const u8, tags: u32, output: u32) ?i32 {
+        const maybe_variable = self.get(name, tags, output);
+        if (maybe_variable) |variable| {
+            return switch (variable) {
+                .integer => |value| value,
+                else => null,
+            };
+        } else return null;
+    }
+
+    pub fn getBoolean(self: *Variables, name: []const u8, tags: u32, output: u32) ?bool {
+        const maybe_variable = self.get(name, tags, output);
+        if (maybe_variable) |variable| {
+            return switch (variable) {
+                .boolean => |value| value,
+                else => null,
+            };
+        } else return null;
+    }
+
+    /// Takes ownership of value.string, which must have used our allocator
+    pub fn put(self: *Variables, name: []const u8, tags: ?u32, output: ?u32, value: Var) !void {
+        const tag = if (tags) |_tags| dominantTag(_tags) else null;
+        var maybe_node = self.data.first;
+        while (maybe_node) |node| : (maybe_node = node.next) {
+            const item = &node.data;
+            if (item.output == output and item.tag == tag and std.mem.eql(u8, item.name, name)) {
+                item.value.deinit(self.allocator);
+                item.value = value;
+                break;
+            }
+        } else {
+            const node = try self.allocator.create(std.SinglyLinkedList(Variable).Node);
+            node.* = .{ .data = Variable{
+                .name = try self.allocator.dupe(u8, name),
+                .output = output,
+                .tag = tag,
+                .value = value,
+            } };
+            self.data.prepend(node);
+        }
+    }
+
+    /// Takes ownership of value.string, which must have used our allocator
+    pub fn putDefault(self: *Variables, name: []const u8, value: Var) !void {
+        try self.put(name, null, null, value);
+    }
+};
+
 pub const Config = struct {
     allocator: std.mem.Allocator,
 
-    layout_specifications: LayoutSpecificationMap,
-    output__active_layout_specification__map: std.hash_map.AutoHashMap(u32, ?[]const u8),
-
-    default_layout: ?*[]const u8,
+    variables: Variables,
 
     pub fn init(allocator: std.mem.Allocator) Config {
         return Config{
             .allocator = allocator,
-            .layout_specifications = LayoutSpecificationMap.init(allocator),
-            .output__active_layout_specification__map = std.hash_map.AutoHashMap(u32, ?[]const u8).init(allocator),
-            .default_layout = null,
+            .variables = Variables.init(allocator),
         };
     }
 
     pub fn deinit(self: *Config) void {
-        var iterator = self.layout_specifications.iterator();
-        while (iterator.next()) |entry| {
-            self.layout_specifications.allocator.free(entry.key_ptr.*);
-            entry.value_ptr.*.deinit();
-            self.layout_specifications.allocator.destroy(entry.value_ptr.*);
-        }
-        self.layout_specifications.deinit();
-
-        self.output__active_layout_specification__map.deinit();
+        self.variables.deinit();
     }
 
     pub fn executeCommand(self: *Config, command: []const u8) !Result {
         var parts: StringTokenIterator = std.mem.tokenizeScalar(u8, command, ' ');
         const part = parts.next() orelse return Result{ .err = "Empty command" };
 
-        if (std.mem.eql(u8, part, "new")) {
-            return executeCommandNew(&parts, &self.layout_specifications);
-        } else if (std.mem.eql(u8, part, "edit")) {
-            return executeCommandEdit(&parts, &self.layout_specifications);
-        } else if (std.mem.eql(u8, part, "default")) {
-            return executeCommandDefault(&parts, self);
+        if (std.mem.eql(u8, part, "set")) {
+            return executeCommandSet(&parts, &self.variables);
         } else {
             return Result{ .err = "Unrecognized first word of command" };
         }
     }
-
-    pub fn getLayoutSpecification(self: *Config, output_name: u32) ?*Tile {
-        const layout_specification_name: []const u8 = (self.output__active_layout_specification__map.get(output_name) orelse return null) orelse return null;
-        return self.layout_specifications.get(layout_specification_name);
-    }
-
-    pub fn getDefaultLayoutSpecification(self: *Config) ?*Tile {
-        return self.layout_specifications.get((self.default_layout orelse return null).*) orelse return null;
-    }
 };
 
-fn executeCommandNew(parts: *StringTokenIterator, layout_specifications: *LayoutSpecificationMap) !Result {
-    const part = parts.next() orelse return Result{ .err = "Premature end of command after 'new'" };
+fn executeCommandSet(parts: *StringTokenIterator, variables: *Variables) !Result {
+    const variable_type_str = parts.next() orelse return Result{ .err = "Premature end of command after 'set', expecting type" };
+    const variable_name = parts.next() orelse return Result{ .err = "Premature end of command after variable type, expecting name" };
+    const operator_str = parts.next() orelse return Result{ .err = "Premature end of command after variable name, expecting operator" };
 
-    if (std.mem.eql(u8, part, "layout")) {
-        return executeCommandNewLayout(parts, layout_specifications);
-    } else if (std.mem.eql(u8, part, "tile")) {
-        return executeCommandNewTile(parts, layout_specifications);
-    } else {
-        return Result{ .err = "Unrecognized word in command after 'new'" };
-    }
-}
+    const variable_type = std.meta.stringToEnum(VarTag, variable_type_str) orelse return Result{ .err = "Unknown variable type" };
 
-fn executeCommandNewLayout(parts: *StringTokenIterator, layout_specifications: *LayoutSpecificationMap) !Result {
-    const layout_name = parts.next() orelse return Result{ .err = "Premature end of command after 'layout'" };
+    const operator = std.meta.stringToEnum(Operator, operator_str) orelse return Result{ .err = "Unknown operator" };
 
-    if (std.mem.indexOfScalar(u8, layout_name, '.') != null) {
-        return Result{ .err = "Layout name contains illegal character '.'" };
+    // TODO Pass current tag and output here
+    const old_value_opt = variables.get(variable_name, 0, 0);
+    if (old_value_opt) |old_value| {
+        if (variable_type != @as(VarTag, old_value)) {
+            return Result{ .err = "Type of variable cannot be changed after initial assignment" };
+        }
     }
 
-    const layout_name_owned = try layout_specifications.allocator.dupe(u8, layout_name);
-    errdefer layout_specifications.allocator.free(layout_name_owned);
-    const layout_get_or_put: std.hash_map.StringHashMap(*Tile).GetOrPutResult = try layout_specifications.getOrPut(layout_name_owned);
-    if (layout_get_or_put.found_existing) {
-        layout_specifications.allocator.free(layout_name_owned);
-        return Result{ .err = "Layout with this name already exists" };
-    }
-
-    const tile = try layout_specifications.allocator.create(Tile);
-    errdefer layout_specifications.allocator.destroy(tile);
-
-    tile.* = try Tile.init(layout_specifications.allocator, layout_name);
-    switch (parseLayoutOptions(parts, tile, false)) {
-        .err => |err| return Result{ .err = err },
-        .ok => {},
-    }
-    layout_get_or_put.value_ptr.* = tile;
-
-    return Result{ .ok = {} };
-}
-
-fn executeCommandNewTile(parts: *StringTokenIterator, layout_specifications: *LayoutSpecificationMap) !Result {
-    const full_tile_name = parts.next() orelse return Result{ .err = "Premature end of command after 'tile'" };
-
-    var tile_name_parts_iterator = std.mem.tokenizeScalar(u8, full_tile_name, '.');
-    const layout_name = tile_name_parts_iterator.next() orelse return Result{ .err = "Premature end of command after 'tile'" };
-
-    const root_tile = layout_specifications.get(layout_name) orelse return Result{ .err = "Layout does not exist" };
-    var tile: *Tile = root_tile;
-
-    const tile_name_parts = try util.tokenIteratorAsSlice(u8, .scalar, layout_specifications.allocator, &tile_name_parts_iterator);
-    defer layout_specifications.allocator.free(tile_name_parts);
-    if (tile_name_parts.len < 1) return Result{ .err = "Missing tile name after layout name" };
-    for (tile_name_parts[0 .. tile_name_parts.len - 1]) |tile_name| {
-        tile = tile.getSubtile(tile_name) orelse return Result{ .err = "Ancestor tile does not exist (create parent tiles first)" };
-    }
-    const tile_name = tile_name_parts[tile_name_parts.len - 1];
-    const subtile = tile.addSubtile(tile_name) catch |err| switch (err) {
-        error.TileAlreadyExists => return Result{ .err = "Tile exists already" },
-        else => |leftover_err| return leftover_err,
+    const variable_value = switch (try newVariableValue(variables.allocator, variable_type, operator, parts, old_value_opt)) {
+        .ok => |val| val,
+        .err => |str| return Result{ .err = str },
     };
+    errdefer variable_value.deinit(variables.allocator);
 
-    return parseLayoutOptions(parts, subtile, false);
-}
+    // TODO Take into account current tag and output if so desired
+    try variables.put(variable_name, null, null, variable_value);
 
-fn executeCommandEdit(parts: *StringTokenIterator, layout_specifications: *LayoutSpecificationMap) !Result {
-    const full_tile_name = parts.next() orelse return Result{ .err = "Premature end of command after 'edit'" };
-
-    var tile_name_parts = std.mem.tokenizeScalar(u8, full_tile_name, '.');
-    const layout_name = tile_name_parts.next() orelse return Result{ .err = "Premature end of command after 'edit'" };
-
-    const root_tile = layout_specifications.get(layout_name) orelse return Result{ .err = "Layout does not exist" };
-    var tile: *Tile = root_tile;
-
-    while (tile_name_parts.next()) |tile_name| {
-        tile = tile.getSubtile(tile_name) orelse return Result{ .err = "Tile does not exist" };
-    }
-
-    return parseLayoutOptions(parts, tile, true);
-}
-
-fn executeCommandDefault(parts: *StringTokenIterator, cfg: *Config) !Result {
-    const part = parts.next() orelse return Result{ .err = "Premature end of command after 'default'" };
-
-    if (std.mem.eql(u8, part, "layout")) {
-        return executeCommandDefaultLayout(parts, cfg);
-    } else {
-        return Result{ .err = "Unrecognized word in command after 'default'" };
-    }
-}
-
-fn executeCommandDefaultLayout(parts: *StringTokenIterator, cfg: *Config) !Result {
-    const layout_name = parts.next() orelse return Result{ .err = "Premature end of command after 'layout'" };
-
-    if (cfg.layout_specifications.getKeyPtr(layout_name)) |layout_name_ptr| {
-        cfg.default_layout = layout_name_ptr;
-        return Result{ .ok = {} };
-    } else {
-        return Result{ .err = "Layout doesn't exist yet (create layout first)" };
-    }
-}
-
-fn parseLayoutOptions(parts: *StringTokenIterator, tile: *Tile, edit: bool) Result {
-    while (parts.next()) |part| {
-        const operation_pos = std.mem.lastIndexOfAny(u8, part, "=-+") orelse return Result{ .err = "Missing '=', '+' or '-' in option" };
-        const option_name = part[0..operation_pos];
-        const option_value = part[operation_pos + 1 ..];
-        const operation = part[operation_pos];
-        if (!edit and operation != '=') return Result{ .err = "New tiles and layouts only support '=' options" };
-        const option_int: ?u31 = std.fmt.parseInt(u31, option_value, 10) catch null;
-
-        if (std.mem.eql(u8, option_name, "type")) {
-            if (operation != '=') return Result{ .err = "Tile type only supports '=', not '+' or '-'" };
-            if (std.mem.eql(u8, option_value, "hsplit")) {
-                tile.typ = TileType.hsplit;
-            } else if (std.mem.eql(u8, option_value, "vsplit")) {
-                tile.typ = TileType.vsplit;
-            } else if (std.mem.eql(u8, option_value, "overlay")) {
-                tile.typ = TileType.overlay;
-            } else return Result{ .err = "Unrecognized tile type (expecting one of 'hsplit', 'vsplit', 'overlay')" };
-        } else if (std.mem.eql(u8, option_name, "stretch")) {
-            const value = option_int orelse return Result{ .err = "Couldn't parse stretch value as positive integer" };
-            tile.stretch = switch (operation) {
-                '=' => value,
-                '-' => tile.stretch -| value,
-                '+' => tile.stretch +| value,
-                else => unreachable,
-            };
-        } else if (std.mem.eql(u8, option_name, "padding")) {
-            if (std.mem.eql(u8, option_value, "inherit")) {
-                tile.padding = null;
-            } else {
-                const value = option_int orelse return Result{ .err = "Couldn't parse padding value as positive integer" };
-                tile.padding = switch (operation) {
-                    '=' => value,
-                    '-' => (tile.padding orelse return Result{ .err = "padding is inherit, can't subtract" }) -| value,
-                    '+' => (tile.padding orelse return Result{ .err = "padding is inherit, can't add" }) +| value,
-                    else => unreachable,
-                };
-            }
-        } else if (std.mem.eql(u8, option_name, "margin")) {
-            const value = option_int orelse return Result{ .err = "Couldn't parse margin value as positive integer" };
-            tile.margin = switch (operation) {
-                '=' => value,
-                '-' => tile.margin -| value,
-                '+' => tile.margin +| value,
-                else => unreachable,
-            };
-        } else if (std.mem.eql(u8, option_name, "order")) {
-            const value = option_int orelse return Result{ .err = "Couldn't parse order value as positive integer" };
-            tile.order = switch (operation) {
-                '=' => value,
-                '-' => tile.order -| value,
-                '+' => tile.order +| value,
-                else => unreachable,
-            };
-            // If tiling order is being set, the user wants this tile to hold views. We set
-            // max-views to unlimited here so the user doesn't have to
-            if (tile.max_views) |max_views| {
-                if (max_views == 0) tile.max_views = null;
-            }
-        } else if (std.mem.eql(u8, option_name, "suborder")) {
-            const value = option_int orelse return Result{ .err = "Couldn't parse suborder value as positive integer" };
-            tile.suborder = switch (operation) {
-                '=' => value,
-                '-' => tile.suborder -| value,
-                '+' => tile.suborder +| value,
-                else => unreachable,
-            };
-            if (tile.max_views) |max_views| {
-                if (max_views == 0) tile.max_views = null;
-            }
-        } else if (std.mem.eql(u8, option_name, "max-views")) {
-            if (std.mem.eql(u8, option_value, "unlimited")) {
-                tile.max_views = null;
-            } else {
-                const value = option_int orelse return Result{ .err = "Couldn't parse max-views value as positive integer" };
-                tile.max_views = switch (operation) {
-                    '=' => value,
-                    '-' => (tile.max_views orelse return Result{ .err = "max-views is unlimited, can't subtract" }) -| value,
-                    '+' => (tile.max_views orelse return Result{ .err = "max-views is unlimited, can't add" }) +| value,
-                    else => unreachable,
-                };
-            }
-        } else return Result{ .err = "Unrecognized option" };
-    }
     return Result{ .ok = {} };
+}
+
+fn newVariableValue(allocator: std.mem.Allocator, variable_type: VarTag, operator: Operator, parts: *StringTokenIterator, old_value_opt: ?Var) !util.Result(Var, []const u8) {
+    return switch (variable_type) {
+        .boolean => newVariableValueBoolean(operator, parts, old_value_opt),
+        .integer => newVariableValueInteger(operator, parts, old_value_opt),
+        .string => try newVariableValueString(allocator, operator, parts, old_value_opt),
+    };
+}
+
+fn parseBoolean(value_str: []const u8) ?bool {
+    return if (std.mem.eql(u8, value_str, "true")) true else if (std.mem.eql(u8, value_str, "false")) false else null;
+}
+
+fn newVariableValueBoolean(operator: Operator, parts: *StringTokenIterator, old_value_opt: ?Var) util.Result(Var, []const u8) {
+    const value_str = parts.next() orelse return .{ .err = "Premature end of command after operator, expecting value" };
+    const parsed_value = parseBoolean(value_str) orelse return .{ .err = "Invalid boolean value" };
+    switch (operator) {
+        .@"=" => {
+            return .{ .ok = Var{ .boolean = parsed_value } };
+        },
+        .@"@" => {
+            if (old_value_opt) |old_value| {
+                std.debug.assert(@as(VarTag, old_value) == VarTag.boolean);
+                return .{ .ok = Var{ .boolean = !old_value.boolean } };
+            } else {
+                return .{ .ok = Var{ .boolean = parsed_value } };
+            }
+        },
+        else => return .{ .err = "Unsupported operator for boolean variable" },
+    }
+}
+
+fn newVariableValueInteger(operator: Operator, parts: *StringTokenIterator, old_value_opt: ?Var) util.Result(Var, []const u8) {
+    const value_str = parts.next() orelse return .{ .err = "Premature end of command after operator, expecting value" };
+    const parsed_value = std.fmt.parseInt(i32, value_str, 10) catch return .{ .err = "Invalid integer value (signed 32-bit integer)" };
+    switch (operator) {
+        .@"=" => {
+            return .{ .ok = Var{ .integer = parsed_value } };
+        },
+        .@"+=" => {
+            if (old_value_opt) |old_value| {
+                std.debug.assert(@as(VarTag, old_value) == VarTag.integer);
+                return .{ .ok = Var{ .integer = old_value.integer +| parsed_value } };
+            } else {
+                return .{ .err = "Cannot add to variable: variable not yet set" };
+            }
+        },
+        .@"-=" => {
+            if (old_value_opt) |old_value| {
+                std.debug.assert(@as(VarTag, old_value) == VarTag.integer);
+                return .{ .ok = Var{ .integer = old_value.integer -| parsed_value } };
+            } else {
+                return .{ .err = "Cannot subtract from variable: variable not yet set" };
+            }
+        },
+        else => return .{ .err = "Unsupported operator for boolean variable" },
+    }
+}
+
+fn newVariableValueString(allocator: std.mem.Allocator, operator: Operator, parts: *StringTokenIterator, old_value_opt: ?Var) !util.Result(Var, []const u8) {
+    // TODO implement cycle (@ operator)
+    if (operator != .@"=") return .{ .err = "Operators other than '=' not yet implemented for string" };
+    _ = old_value_opt;
+    const value_str = parts.next() orelse return .{ .err = "Premature end of command after operator, expecting value" };
+    return .{ .ok = Var{ .string = try allocator.dupe(u8, value_str) } };
 }
 
 test {
     var cfg = Config.init(std.testing.allocator);
     defer cfg.deinit();
-    var layout_specifications = &cfg.layout_specifications;
+    var variables = &cfg.variables;
 
-    const result1 = try cfg.executeCommand("new layout main-left type=hsplit padding=5 margin=7");
+    const result1 = try cfg.executeCommand("set integer main-count = 3");
     try std.testing.expectEqual(Result{ .ok = {} }, result1);
-    const result2 = try cfg.executeCommand("new tile main-left.left type=vsplit stretch=25 order=2");
+    const main_count1 = variables.get("main-count", 0, 0).?;
+    try std.testing.expectEqual(@as(i32, 3), main_count1.integer);
+
+    const result2 = try cfg.executeCommand("set integer main-count = 1");
     try std.testing.expectEqual(Result{ .ok = {} }, result2);
-    const result3 = try cfg.executeCommand("new tile main-left.main type=vsplit stretch=25 order=1 suborder=2 max-views=1");
+    const main_count2 = variables.get("main-count", 0, 0).?;
+    try std.testing.expectEqual(@as(i32, 1), main_count2.integer);
+
+    const result3 = try cfg.executeCommand("set string override-layout = main-center");
     try std.testing.expectEqual(Result{ .ok = {} }, result3);
-    const result4 = try cfg.executeCommand("new tile main-left.main");
-    try std.testing.expectEqualStrings("Tile exists already", result4.err);
-    const result5 = try cfg.executeCommand("new tile main-left.main.submain order=1 suborder=1 max-views=1");
+    const override_layout1 = variables.get("override-layout", 0, 0).?;
+    try std.testing.expectEqualStrings("main-center", override_layout1.string);
+
+    const result4 = try cfg.executeCommand("set string override-layout = main-left");
+    try std.testing.expectEqual(Result{ .ok = {} }, result4);
+    const override_layout2 = variables.get("override-layout", 0, 0).?;
+    try std.testing.expectEqualStrings("main-left", override_layout2.string);
+
+    const result5 = try cfg.executeCommand("set boolean collapse = true");
     try std.testing.expectEqual(Result{ .ok = {} }, result5);
-    const result6 = try cfg.executeCommand("default layout main-left");
-    try std.testing.expectEqual(Result{ .ok = {} }, result6);
-
-    const mainleft_root = layout_specifications.get("main-left").?;
-    try std.testing.expectEqual(TileType.hsplit, mainleft_root.typ);
-    try std.testing.expectEqual(@as(u32, 1), mainleft_root.stretch);
-    try std.testing.expectEqual(@as(?u31, 5), mainleft_root.padding);
-    try std.testing.expectEqual(@as(?u31, 7), mainleft_root.margin);
-    try std.testing.expectEqual(@as(?u31, 0), mainleft_root.max_views);
-
-    try std.testing.expectEqual(@as(usize, 2), mainleft_root.subtiles.items.len);
-
-    const mainleft_left = mainleft_root.getSubtile("left").?;
-    try std.testing.expectEqual(TileType.vsplit, mainleft_left.typ);
-    try std.testing.expectEqual(@as(u32, 25), mainleft_left.stretch);
-    try std.testing.expectEqual(@as(?u31, null), mainleft_left.max_views);
-    try std.testing.expectEqual(@as(u32, 2), mainleft_left.order);
-    try std.testing.expectEqual(@as(u32, 0), mainleft_left.suborder);
-
-    const mainleft_main = mainleft_root.getSubtile("main").?;
-    try std.testing.expectEqual(TileType.vsplit, mainleft_main.typ);
-    try std.testing.expectEqual(@as(u32, 25), mainleft_main.stretch);
-    try std.testing.expectEqual(@as(?u31, 1), mainleft_main.max_views);
-    try std.testing.expectEqual(@as(u32, 1), mainleft_main.order);
-    try std.testing.expectEqual(@as(u32, 2), mainleft_main.suborder);
-
-    const mainleft_submain = mainleft_main.getSubtile("submain").?;
-    try std.testing.expectEqual(@as(?u31, 1), mainleft_submain.max_views);
-    try std.testing.expectEqual(@as(u32, 1), mainleft_submain.order);
-    try std.testing.expectEqual(@as(u32, 1), mainleft_submain.suborder);
-
-    const result7 = try cfg.executeCommand("edit main-left.main stretch+25 order+2 suborder-2 max-views+1");
-    try std.testing.expectEqual(Result{ .ok = {} }, result7);
-    try std.testing.expectEqual(@as(u32, 50), mainleft_main.stretch);
-    try std.testing.expectEqual(@as(?u31, 2), mainleft_main.max_views);
-    try std.testing.expectEqual(@as(u32, 3), mainleft_main.order);
-    try std.testing.expectEqual(@as(u32, 0), mainleft_main.suborder);
+    const collapse1 = variables.get("collapse", 0, 0).?;
+    try std.testing.expectEqual(true, collapse1.boolean);
 }

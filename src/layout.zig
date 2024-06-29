@@ -487,7 +487,7 @@ fn determineViewDimensions(allocator: std.mem.Allocator, view_count: u32, tile_i
     return view_dimensions;
 }
 
-pub fn layout(allocator: std.mem.Allocator, root_tile: *Tile, view_count: u32, usable_width: u31, usable_height: u31) ![]Dimensions {
+pub fn layout(allocator: std.mem.Allocator, root_tile: *const Tile, view_count: u32, usable_width: u31, usable_height: u31) ![]Dimensions {
     var tile_infos = try buildFillingInfo(allocator, root_tile);
     defer tile_infos.deinit();
 

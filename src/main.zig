@@ -29,6 +29,7 @@ const wl = wayland.client.wl;
 const river = wayland.client.river;
 
 const layout = @import("layout.zig");
+const user_config = @import("user_config.zig");
 const config = @import("config.zig");
 const util = @import("util.zig");
 
@@ -106,9 +107,9 @@ fn handleLayoutDemand(layout_proto: *river.LayoutV3, output: *Output, view_count
     defer allocator_instance.deinit();
     const allocator = allocator_instance.allocator();
 
-    const root_tile = cfg.getLayoutSpecification(output.name) orelse cfg.getDefaultLayoutSpecification() orelse return error.NoLayouts;
+    const root_tile = try user_config.layoutSpecification(allocator, &cfg.variables, view_count, usable_width, usable_height, output.name, output.tags);
 
-    const view_dimensions = try layout.layout(allocator, root_tile, view_count, @as(u31, @truncate(usable_width)), @as(u31, @truncate(usable_height)));
+    const view_dimensions = try layout.layout(allocator, &root_tile, view_count, @as(u31, @truncate(usable_width)), @as(u31, @truncate(usable_height)));
 
     log.info("Proposing {} views:", .{view_dimensions.len});
     for (view_dimensions) |dim| {
@@ -144,6 +145,8 @@ pub fn main() !void {
         try std.io.getStdOut().writeAll(build_options.version ++ "\n");
         std.posix.exit(0);
     }
+
+    try user_config.setDefaultVariables(&cfg.variables);
 
     const display = wl.Display.connect(null) catch {
         fatal("unable to connect to wayland compositor", .{});
@@ -216,7 +219,6 @@ fn registryEvent(context: *Context, registry: *wl.Registry, event: wl.Registry.E
                 if (node.data.name == ev.name) {
                     node.data.wl_output.release();
                     node.data.layout.destroy();
-                    _ = cfg.output__active_layout_specification__map.remove(node.data.name);
                     context.outputs.remove(node);
                     gpa.destroy(node);
                     break;

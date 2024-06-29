@@ -10,48 +10,47 @@ hsplits, and configure the order in which views should be assigned in the grid.
 Same requirements as **[river]**, use [Zig] 0.12, if **[river]** and
 _rivertile_ work on your machine you shouldn't have any problems.
 
-Build, `e.g.`
+Build with e.g.
 
     zig build -Doptimize=ReleaseSafe --prefix ~/.local
 
-## Usage and configuration
+## Configuration
 
 In your **river** init (usually `$XDG_CONFIG_HOME/river/init`), start river-ultitile (snippet below).
 
-Configuration happens by sending commands to a running river-ultitile instance. With these commands
-you build a grid of nested tiles, which can be nested arbitrarily deep. Certain tiles should be
-designated to hold views; this can be done by either setting an `order` (as explained below) or
-setting their `max-views` to `unlimited` or a non-zero number.
+Configuration happens by modifying `src/user_config.zig` and recompiling. The default configuration
+provides these layouts, that can be chosen at runtime (see snippet below):
+- dwm-like main/stack layout that puts the main view in the center on wide displays and on
+  the left on narrower ones,
+- a vertical stack,
+- a horizontal stack, and
+- a monocle layout.
 
-Tiles can have their contents arranged horizontally (`type=hsplit`), vertically
-(`type=vsplit`), or superimposed (`type=overlay`).
+In the `src/user_config.zig` file, the function `layoutSpecification` should return your layout
+expressed in terms of tiles which can be nested arbitrarily deep. Certain tiles should be
+designated to hold views by setting their `max_views` to `null` (for unlimited) or a non-zero
+number.
+
+Tiles can have their contents arranged horizontally (`typ=.hsplit`), vertically
+(`typ=.vsplit`), or superimposed (`typ=.overlay`).
 
 Views are assigned to tiles in an order determined by the `order` property of the tiles. The
 assignment of views starts with the lower orders, so lower orders get the views on the top of the
 river view stack. Tiles with the same `order` will share the assigned views evenly. Use `suborder`
 to determine views higher on the stack will come. Having tiles with the same `order` and `suborder`
-and a non-zero `max-views` is not allowed.
-
-Per-output or per-tag configuration is not yet possible.
-
-The commands are as follows:
-- `new layout <layoutname> [properties for root tile]…`
-- `new tile <layoutname>.<tilename>[.<tilename>]… [properties]…`
-- `edit <layoutname>[.<tilename>]… [properties]…`
-- `default layout <layoutname>`: set the named layout as default for all outputs
+and a non-zero `max_views` is not allowed.
 
 Tile properties are:
-- `type=<hsplit|vsplit|overlay>` (default `hsplit`)
-- `padding=<number|inherit>` (default `inherit`): space around the tile's 
+- `typ=<.hsplit|.vsplit|.overlay>` (default `.hsplit`)
+- `padding=<number|null>` (default `null`; `null` means inherit)): space around the tile's contents
 - `margin=<number>` (default `0`): space around the tile
 - `stretch=<number>` (default `100`): a relative width specifier. The stretches of a tile's
     subtiles are summed, and the subtiles get a width proportional to their stretch divided by that
     sum. Views always have a stretch of 100.
-- `order=<number>` (default `0`): see above. Setting `order` also sets `max-views=unlimited` if
-    `max-views` is `0`.
-- `suborder=<number>` (default `0`): see above. Setting `suborder` also sets `max-views=unlimited`
-    if `max-views` is `0`.
-- `max-views=<number|unlimited>` (default `0`): the maximum amount of views that will be assigned
+- `order=<number>` (default `0`): see above
+- `suborder=<number>` (default `0`): see above
+- `max_views=<number|null>` (default `0`; `null` means unlimited): the maximum amount of views that
+  will be assigned to this tile
 
 ```bash
 riverctl map normal $mod K focus-view previous
@@ -64,31 +63,20 @@ riverctl map normal $mod Z zoom
 riverctl default-layout river-ultitile
 river-ultitile &
 
-ultitile() {
-	riverctl send-layout-cmd river-ultitile "$*"
-}
-ultitile new layout hstack type=hsplit padding=5 margin=5 max-views=unlimited
-
-ultitile new layout main-left type=hsplit padding=5 margin=5
-ultitile new tile main-left.left type=vsplit stretch=40 order=1
-ultitile new tile main-left.main type=vsplit stretch=60 order=0 max-views=1
-
-ultitile new layout main-center type=hsplit padding=5 margin=5
-ultitile new tile main-center.left type=vsplit stretch=25 order=1 suborder=0
-ultitile new tile main-center.main type=vsplit stretch=50 order=0 max-views=1
-ultitile new tile main-center.right type=vsplit stretch=25 order=1 suborder=1
-
-ultitile new layout monocle type=overlay max-views=unlimited
-
-ultitile default layout main-center
-
+# These keybinds work with the default river-ultitile configuration
 # Mod+U and Mod+I to increase/decrease the main size
-riverctl map normal $mod U send-layout-cmd river-ultitile "edit main-center.main stretch+5"
-riverctl map normal $mod I send-layout-cmd river-ultitile "edit main-center.main stretch-5"
+riverctl map normal $mod U send-layout-cmd river-ultitile "set integer main-size += 5"
+riverctl map normal $mod I send-layout-cmd river-ultitile "set integer main-size -= 5"
 
 # Mod+Shift+U and Mod+Shift+I to decrease/increase the main count
-riverctl map normal $mod+Shift U send-layout-cmd river-ultitile "edit main-center.main max-views-1"
-riverctl map normal $mod+Shift I send-layout-cmd river-ultitile "edit main-center.main max-views+1"
+riverctl map normal $mod+Shift U send-layout-cmd river-ultitile "set integer main-count -= 1"
+riverctl map normal $mod+Shift I send-layout-cmd river-ultitile "set integer main-count += 1"
+
+# Mod+{Up,Right,Down,Left} to change layout
+riverctl map normal $mod Up    send-layout-cmd river-ultitile "set string layout = vstack"
+riverctl map normal $mod Right send-layout-cmd river-ultitile "set string layout = hstack"
+riverctl map normal $mod Down  send-layout-cmd river-ultitile "set string layout = monocle"
+riverctl map normal $mod Left  send-layout-cmd river-ultitile "set string layout = main"
 ```
 
 ## Contributing
