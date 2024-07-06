@@ -51,9 +51,12 @@ pub fn build(b: *std.Build) !void {
     const scanner = Scanner.create(b, .{});
 
     scanner.addCustomProtocol("protocol/river-layout-v3.xml");
+    scanner.addCustomProtocol("protocol/river-status-unstable-v1.xml");
 
     scanner.generate("wl_output", 4);
+    scanner.generate("wl_seat", 9);
     scanner.generate("river_layout_manager_v3", 2);
+    scanner.generate("zriver_status_manager_v1", 4);
 
     const wayland = b.createModule(.{ .root_source_file = scanner.result });
     const flags = b.createModule(.{ .root_source_file = .{ .path = "common/flags.zig" } });

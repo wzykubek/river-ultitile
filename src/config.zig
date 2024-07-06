@@ -2,6 +2,7 @@
 // See main.zig and COPYING for copyright info
 
 const std = @import("std");
+const main = @import("main.zig");
 const util = @import("util.zig");
 
 /// The stretch value used for views and as default for tiles
@@ -150,8 +151,8 @@ pub const Variables = struct {
         }
     }
 
-    pub fn get(self: *Variables, name: []const u8, tags: u32, output: u32) ?Var {
-        const tag = dominantTag(tags);
+    pub fn get(self: *Variables, name: []const u8, tags: ?u32, output: ?u32) ?Var {
+        const tag = if (tags) |t| dominantTag(t) else null;
         var max_specificity_found: u8 = 0;
         var value_found: ?Var = null;
         var maybe_node = self.data.first;
@@ -249,19 +250,29 @@ pub const Config = struct {
         self.variables.deinit();
     }
 
-    pub fn executeCommand(self: *Config, command: []const u8) !Result {
+    pub fn executeCommand(self: *Config, command: []const u8, ctx: *main.Context) !Result {
         var parts: StringTokenIterator = std.mem.tokenizeScalar(u8, command, ' ');
         const part = parts.next() orelse return Result{ .err = "Empty command" };
 
         if (std.mem.eql(u8, part, "set")) {
-            return executeCommandSet(&parts, &self.variables);
+            return executeCommandSet(&parts, &self.variables, ctx);
         } else {
             return Result{ .err = "Unrecognized first word of command" };
         }
     }
 };
 
-fn executeCommandSet(parts: *StringTokenIterator, variables: *Variables) !Result {
+fn getFocusedOutputName(ctx: *main.Context) ?u32 {
+    const focused_output = ctx.seat.?.focused_output orelse return null;
+    return focused_output.name;
+}
+
+fn getCurrentTags(ctx: *main.Context) ?u32 {
+    const focused_output = ctx.seat.?.focused_output orelse return null;
+    return focused_output.tags;
+}
+
+fn executeCommandSet(parts: *StringTokenIterator, variables: *Variables, ctx: *main.Context) !Result {
     const variable_type_str = parts.next() orelse return Result{ .err = "Premature end of command after 'set', expecting type" };
     const variable_name = parts.next() orelse return Result{ .err = "Premature end of command after variable type, expecting name" };
     const operator_str = parts.next() orelse return Result{ .err = "Premature end of command after variable name, expecting operator" };
@@ -270,8 +281,10 @@ fn executeCommandSet(parts: *StringTokenIterator, variables: *Variables) !Result
 
     const operator = std.meta.stringToEnum(Operator, operator_str) orelse return Result{ .err = "Unknown operator" };
 
-    // TODO Pass current tag and output here
-    const old_value_opt = variables.get(variable_name, 0, 0);
+    const focused_output = getFocusedOutputName(ctx);
+    const current_tags = getCurrentTags(ctx);
+
+    const old_value_opt = variables.get(variable_name, current_tags, focused_output);
     if (old_value_opt) |old_value| {
         if (variable_type != @as(VarTag, old_value)) {
             return Result{ .err = "Type of variable cannot be changed after initial assignment" };
@@ -284,8 +297,7 @@ fn executeCommandSet(parts: *StringTokenIterator, variables: *Variables) !Result
     };
     errdefer variable_value.deinit(variables.allocator);
 
-    // TODO Take into account current tag and output if so desired
-    try variables.put(variable_name, null, null, variable_value);
+    try variables.put(variable_name, current_tags, focused_output, variable_value);
 
     return Result{ .ok = {} };
 }
