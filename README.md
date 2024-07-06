@@ -81,7 +81,8 @@ riverctl map normal $mod Left  send-layout-cmd river-ultitile "set string layout
 # By default, variables are local to the output+tag combination. If you want to set a
 # variable globally, use e.g. "set global string layout = main", but note that local variable
 # values will take precedence. A local variable for the current output+tag can be removed with e.g.
-# "clear-local layout" (for the variable named "layout").
+# "clear-local layout" (for the variable named "layout") and a all local values for a variable can
+# be cleared with "clear-all-local layout".
 ```
 
 ## Contributing

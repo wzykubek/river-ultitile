@@ -245,6 +245,18 @@ pub const Variables = struct {
             }
         }
     }
+
+    pub fn removeAllLocal(self: *Variables, name: []const u8) void {
+        var maybe_node = self.data.first;
+        while (maybe_node) |node| : (maybe_node = node.next) {
+            const item = &node.data;
+            if (item.output != null and item.tag != null and std.mem.eql(u8, item.name, name)) {
+                item.deinit(self.allocator);
+                self.data.remove(node);
+                break;
+            }
+        }
+    }
 };
 
 pub const Config = struct {
@@ -271,6 +283,8 @@ pub const Config = struct {
             return executeCommandSet(&parts, &self.variables, ctx);
         } else if (std.mem.eql(u8, part, "clear-local")) {
             return executeCommandClearLocal(&parts, &self.variables, ctx);
+        } else if (std.mem.eql(u8, part, "clear-all-local")) {
+            return executeCommandClearAllLocal(&parts, &self.variables);
         } else {
             return Result{ .err = "Unrecognized first word of command" };
         }
@@ -329,6 +343,14 @@ fn executeCommandClearLocal(parts: *StringTokenIterator, variables: *Variables, 
     const current_tags = getCurrentTags(ctx) orelse unreachable;
 
     variables.remove(variable_name, current_tags, focused_output);
+
+    return Result{ .ok = {} };
+}
+
+fn executeCommandClearAllLocal(parts: *StringTokenIterator, variables: *Variables) !Result {
+    const variable_name = parts.next() orelse return Result{ .err = "Premature end of command after 'clear-all-local', expecting name" };
+
+    variables.removeAllLocal(variable_name);
 
     return Result{ .ok = {} };
 }
