@@ -232,6 +232,19 @@ pub const Variables = struct {
     pub fn putDefault(self: *Variables, name: []const u8, value: Var) !void {
         try self.put(name, null, null, value);
     }
+
+    pub fn remove(self: *Variables, name: []const u8, tags: ?u32, output: ?u32) void {
+        const tag = if (tags) |_tags| dominantTag(_tags) else null;
+        var maybe_node = self.data.first;
+        while (maybe_node) |node| : (maybe_node = node.next) {
+            const item = &node.data;
+            if (item.output == output and item.tag == tag and std.mem.eql(u8, item.name, name)) {
+                item.deinit(self.allocator);
+                self.data.remove(node);
+                break;
+            }
+        }
+    }
 };
 
 pub const Config = struct {
@@ -256,6 +269,8 @@ pub const Config = struct {
 
         if (std.mem.eql(u8, part, "set")) {
             return executeCommandSet(&parts, &self.variables, ctx);
+        } else if (std.mem.eql(u8, part, "clear-local")) {
+            return executeCommandClearLocal(&parts, &self.variables, ctx);
         } else {
             return Result{ .err = "Unrecognized first word of command" };
         }
@@ -273,7 +288,12 @@ fn getCurrentTags(ctx: *main.Context) ?u32 {
 }
 
 fn executeCommandSet(parts: *StringTokenIterator, variables: *Variables, ctx: *main.Context) !Result {
-    const variable_type_str = parts.next() orelse return Result{ .err = "Premature end of command after 'set', expecting type" };
+    var variable_type_str = parts.next() orelse return Result{ .err = "Premature end of command after 'set', expecting type or 'global'" };
+    var global = false;
+    if (std.mem.eql(u8, variable_type_str, "global")) {
+        global = true;
+        variable_type_str = parts.next() orelse return Result{ .err = "Premature end of command after 'set', expecting type" };
+    }
     const variable_name = parts.next() orelse return Result{ .err = "Premature end of command after variable type, expecting name" };
     const operator_str = parts.next() orelse return Result{ .err = "Premature end of command after variable name, expecting operator" };
 
@@ -281,8 +301,8 @@ fn executeCommandSet(parts: *StringTokenIterator, variables: *Variables, ctx: *m
 
     const operator = std.meta.stringToEnum(Operator, operator_str) orelse return Result{ .err = "Unknown operator" };
 
-    const focused_output = getFocusedOutputName(ctx);
-    const current_tags = getCurrentTags(ctx);
+    const focused_output = if (global) null else getFocusedOutputName(ctx);
+    const current_tags = if (global) null else getCurrentTags(ctx);
 
     const old_value_opt = variables.get(variable_name, current_tags, focused_output);
     if (old_value_opt) |old_value| {
@@ -298,6 +318,17 @@ fn executeCommandSet(parts: *StringTokenIterator, variables: *Variables, ctx: *m
     errdefer variable_value.deinit(variables.allocator);
 
     try variables.put(variable_name, current_tags, focused_output, variable_value);
+
+    return Result{ .ok = {} };
+}
+
+fn executeCommandClearLocal(parts: *StringTokenIterator, variables: *Variables, ctx: *main.Context) !Result {
+    const variable_name = parts.next() orelse return Result{ .err = "Premature end of command after 'clear-local', expecting name" };
+
+    const focused_output = getFocusedOutputName(ctx) orelse return Result{ .err = "No focused output is not registered" };
+    const current_tags = getCurrentTags(ctx) orelse unreachable;
+
+    variables.remove(variable_name, current_tags, focused_output);
 
     return Result{ .ok = {} };
 }

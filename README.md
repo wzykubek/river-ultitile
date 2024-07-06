@@ -77,6 +77,11 @@ riverctl map normal $mod Up    send-layout-cmd river-ultitile "set string layout
 riverctl map normal $mod Right send-layout-cmd river-ultitile "set string layout = hstack"
 riverctl map normal $mod Down  send-layout-cmd river-ultitile "set string layout = monocle"
 riverctl map normal $mod Left  send-layout-cmd river-ultitile "set string layout = main"
+
+# By default, variables are local to the output+tag combination. If you want to set a
+# variable globally, use e.g. "set global string layout = main", but note that local variable
+# values will take precedence. A local variable for the current output+tag can be removed with e.g.
+# "clear-local layout" (for the variable named "layout").
 ```
 
 ## Contributing
