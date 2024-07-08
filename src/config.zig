@@ -454,68 +454,61 @@ fn newVariableValueString(allocator: std.mem.Allocator, operator: Operator, part
     }
 }
 
+fn executeTestCommand(cfg: *Config, command: []const u8) !void {
+    const result = try cfg.executeCommand(command, .{});
+    try std.testing.expectEqual(Result{ .ok = {} }, result);
+}
+
 test {
     var cfg = Config.init(std.testing.allocator);
     defer cfg.deinit();
     var variables = &cfg.variables;
 
-    const result1 = try cfg.executeCommand("set integer main-count = 3", .{});
-    try std.testing.expectEqual(Result{ .ok = {} }, result1);
+    try executeTestCommand(&cfg, "set integer main-count = 3");
     const main_count1 = variables.get("main-count", 0, 0).?;
     try std.testing.expectEqual(@as(i32, 3), main_count1.integer);
 
-    const result2 = try cfg.executeCommand("set integer main-count = 1", .{});
-    try std.testing.expectEqual(Result{ .ok = {} }, result2);
+    try executeTestCommand(&cfg, "set integer main-count = 1");
     const main_count2 = variables.get("main-count", 0, 0).?;
     try std.testing.expectEqual(@as(i32, 1), main_count2.integer);
 
-    const result3 = try cfg.executeCommand("set string override-layout = main-center", .{});
-    try std.testing.expectEqual(Result{ .ok = {} }, result3);
+    try executeTestCommand(&cfg, "set string override-layout = main-center");
     const override_layout1 = variables.get("override-layout", 0, 0).?;
     try std.testing.expectEqualStrings("main-center", override_layout1.string);
 
-    const result4 = try cfg.executeCommand("set string override-layout = main-left", .{});
-    try std.testing.expectEqual(Result{ .ok = {} }, result4);
+    try executeTestCommand(&cfg, "set string override-layout = main-left");
     const override_layout2 = variables.get("override-layout", 0, 0).?;
     try std.testing.expectEqualStrings("main-left", override_layout2.string);
 
-    const result5 = try cfg.executeCommand("set boolean collapse = true", .{});
-    try std.testing.expectEqual(Result{ .ok = {} }, result5);
+    try executeTestCommand(&cfg, "set boolean collapse = true");
     const collapse1 = variables.get("collapse", 0, 0).?;
     try std.testing.expectEqual(true, collapse1.boolean);
 
-    const result6 = try cfg.executeCommand("set integer column-count @ 1 3 2", .{});
-    try std.testing.expectEqual(Result{ .ok = {} }, result6);
+    try executeTestCommand(&cfg, "set integer column-count @ 1 3 2");
     const column_count1 = variables.get("column-count", 0, 0).?;
     try std.testing.expectEqual(1, column_count1.integer);
 
-    const result7 = try cfg.executeCommand("set integer column-count @ 1 3 2", .{});
-    try std.testing.expectEqual(Result{ .ok = {} }, result7);
+    try executeTestCommand(&cfg, "set integer column-count @ 1 3 2");
     const column_count2 = variables.get("column-count", 0, 0).?;
     try std.testing.expectEqual(3, column_count2.integer);
 
-    const result8 = try cfg.executeCommand("set integer column-count @ 1 3 2", .{});
-    try std.testing.expectEqual(Result{ .ok = {} }, result8);
+    try executeTestCommand(&cfg, "set integer column-count @ 1 3 2");
     const column_count3 = variables.get("column-count", 0, 0).?;
     try std.testing.expectEqual(2, column_count3.integer);
 
-    const result9 = try cfg.executeCommand("set integer column-count @ 1 3 2", .{});
-    try std.testing.expectEqual(Result{ .ok = {} }, result9);
+    try executeTestCommand(&cfg, "set integer column-count @ 1 3 2");
     const column_count4 = variables.get("column-count", 0, 0).?;
     try std.testing.expectEqual(1, column_count4.integer);
 
-    const result10 = try cfg.executeCommand("set string layout @ main monocle", .{});
-    try std.testing.expectEqual(Result{ .ok = {} }, result10);
+    try executeTestCommand(&cfg, "set string layout @ main monocle");
     const layout1 = variables.get("layout", 0, 0).?;
     try std.testing.expectEqualStrings("main", layout1.string);
 
-    const result11 = try cfg.executeCommand("set string layout @ main monocle", .{});
-    try std.testing.expectEqual(Result{ .ok = {} }, result11);
+    try executeTestCommand(&cfg, "set string layout @ main monocle");
     const layout2 = variables.get("layout", 0, 0).?;
     try std.testing.expectEqualStrings("monocle", layout2.string);
 
-    const result12 = try cfg.executeCommand("set string layout @ main monocle", .{});
-    try std.testing.expectEqual(Result{ .ok = {} }, result12);
+    try executeTestCommand(&cfg, "set string layout @ main monocle");
     const layout3 = variables.get("layout", 0, 0).?;
     try std.testing.expectEqualStrings("main", layout3.string);
 }
