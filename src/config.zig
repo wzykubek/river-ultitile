@@ -377,21 +377,21 @@ fn newVariableValueBoolean(operator: Operator, parts: *StringTokenIterator, old_
                 return .{ .ok = Var{ .boolean = parsed_value } };
             }
         },
-        else => return .{ .err = "Unsupported operator for boolean variable" },
+        else => return .{ .err = "Unsupported operator for boolean variable, supported are = and @" },
     }
 }
 
 fn newVariableValueInteger(operator: Operator, parts: *StringTokenIterator, old_value_opt: ?Var) util.Result(Var, []const u8) {
     const value_str = parts.next() orelse return .{ .err = "Premature end of command after operator, expecting value" };
-    const parsed_value = std.fmt.parseInt(i32, value_str, 10) catch return .{ .err = "Invalid integer value (signed 32-bit integer)" };
+    const first_value = std.fmt.parseInt(i32, value_str, 10) catch return .{ .err = "Invalid integer value (signed 32-bit integer)" };
     switch (operator) {
         .@"=" => {
-            return .{ .ok = Var{ .integer = parsed_value } };
+            return .{ .ok = Var{ .integer = first_value } };
         },
         .@"+=" => {
             if (old_value_opt) |old_value| {
                 std.debug.assert(@as(VarTag, old_value) == VarTag.integer);
-                return .{ .ok = Var{ .integer = old_value.integer +| parsed_value } };
+                return .{ .ok = Var{ .integer = old_value.integer +| first_value } };
             } else {
                 return .{ .err = "Cannot add to variable: variable not yet set" };
             }
@@ -399,7 +399,7 @@ fn newVariableValueInteger(operator: Operator, parts: *StringTokenIterator, old_
         .@"-=" => {
             if (old_value_opt) |old_value| {
                 std.debug.assert(@as(VarTag, old_value) == VarTag.integer);
-                return .{ .ok = Var{ .integer = old_value.integer -| parsed_value } };
+                return .{ .ok = Var{ .integer = old_value.integer -| first_value } };
             } else {
                 return .{ .err = "Cannot subtract from variable: variable not yet set" };
             }
@@ -407,31 +407,51 @@ fn newVariableValueInteger(operator: Operator, parts: *StringTokenIterator, old_
         .@"@" => {
             if (old_value_opt) |old_value| {
                 std.debug.assert(@as(VarTag, old_value) == VarTag.integer);
-                var value = parsed_value;
+                var value = first_value;
                 while (value != old_value.integer) {
                     const next_value_str = parts.next() orelse
                         // Current value is not in cycle list, return first of cycle list
-                        return .{ .ok = Var{ .integer = parsed_value } };
+                        return .{ .ok = Var{ .integer = first_value } };
                     value = std.fmt.parseInt(i32, next_value_str, 10) catch return .{ .err = "Invalid integer value (signed 32-bit integer)" };
                 }
                 const next_value_str = parts.next() orelse
                     // Current value is last of cycle list, return first of cycle list
-                    return .{ .ok = Var{ .integer = parsed_value } };
+                    return .{ .ok = Var{ .integer = first_value } };
                 value = std.fmt.parseInt(i32, next_value_str, 10) catch return .{ .err = "Invalid integer value (signed 32-bit integer)" };
                 return .{ .ok = Var{ .integer = value } };
             } else {
-                return .{ .ok = Var{ .integer = parsed_value } };
+                return .{ .ok = Var{ .integer = first_value } };
             }
         },
     }
 }
 
 fn newVariableValueString(allocator: std.mem.Allocator, operator: Operator, parts: *StringTokenIterator, old_value_opt: ?Var) !util.Result(Var, []const u8) {
-    // TODO implement cycle (@ operator)
-    if (operator != .@"=") return .{ .err = "Operators other than '=' not yet implemented for string" };
-    _ = old_value_opt;
-    const value_str = parts.next() orelse return .{ .err = "Premature end of command after operator, expecting value" };
-    return .{ .ok = Var{ .string = try allocator.dupe(u8, value_str) } };
+    const first_value = parts.next() orelse return .{ .err = "Premature end of command after operator, expecting value" };
+    switch (operator) {
+        .@"=" => {
+            return .{ .ok = Var{ .string = try allocator.dupe(u8, first_value) } };
+        },
+        .@"@" => {
+            if (old_value_opt) |old_value| {
+                std.debug.assert(@as(VarTag, old_value) == VarTag.string);
+                var value = first_value;
+                while (!std.mem.eql(u8, value, old_value.string)) {
+                    value = parts.next() orelse
+                        // Current value is not in cycle list, return first of cycle list
+                        return .{ .ok = Var{ .string = try allocator.dupe(u8, first_value) } };
+                }
+                value = parts.next() orelse
+                    // Current value is last of cycle list, return first of cycle list
+                    return .{ .ok = Var{ .string = try allocator.dupe(u8, first_value) } };
+
+                return .{ .ok = Var{ .string = try allocator.dupe(u8, value) } };
+            } else {
+                return .{ .ok = Var{ .string = try allocator.dupe(u8, first_value) } };
+            }
+        },
+        else => return .{ .err = "Unsupported operator for string variable, supported are = and @" },
+    }
 }
 
 test {
@@ -483,4 +503,19 @@ test {
     try std.testing.expectEqual(Result{ .ok = {} }, result9);
     const column_count4 = variables.get("column-count", 0, 0).?;
     try std.testing.expectEqual(1, column_count4.integer);
+
+    const result10 = try cfg.executeCommand("set string layout @ main monocle", .{});
+    try std.testing.expectEqual(Result{ .ok = {} }, result10);
+    const layout1 = variables.get("layout", 0, 0).?;
+    try std.testing.expectEqualStrings("main", layout1.string);
+
+    const result11 = try cfg.executeCommand("set string layout @ main monocle", .{});
+    try std.testing.expectEqual(Result{ .ok = {} }, result11);
+    const layout2 = variables.get("layout", 0, 0).?;
+    try std.testing.expectEqualStrings("monocle", layout2.string);
+
+    const result12 = try cfg.executeCommand("set string layout @ main monocle", .{});
+    try std.testing.expectEqual(Result{ .ok = {} }, result12);
+    const layout3 = variables.get("layout", 0, 0).?;
+    try std.testing.expectEqualStrings("main", layout3.string);
 }
