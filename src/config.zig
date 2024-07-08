@@ -2,8 +2,9 @@
 // See main.zig and COPYING for copyright info
 
 const std = @import("std");
-const main = @import("main.zig");
+const builtin = @import("builtin");
 const util = @import("util.zig");
+const main = @import("main.zig");
 
 /// The stretch value used for views and as default for tiles
 pub const default_stretch: u32 = 100;
@@ -87,6 +88,11 @@ pub const Tile = struct {
 pub const Result = util.Result(void, []const u8);
 
 const StringTokenIterator = std.mem.TokenIterator(u8, .scalar);
+
+pub const OutputAndTags = struct {
+    output_name: ?u32 = null,
+    tags: ?u32 = null,
+};
 
 /// Find the lowest tag that's set in a tag bitmask
 pub fn dominantTag(tags: u32) u32 {
@@ -275,14 +281,14 @@ pub const Config = struct {
         self.variables.deinit();
     }
 
-    pub fn executeCommand(self: *Config, command: []const u8, ctx: *main.Context) !Result {
+    pub fn executeCommand(self: *Config, command: []const u8, current_output_tag: OutputAndTags) !Result {
         var parts: StringTokenIterator = std.mem.tokenizeScalar(u8, command, ' ');
         const part = parts.next() orelse return Result{ .err = "Empty command" };
 
         if (std.mem.eql(u8, part, "set")) {
-            return executeCommandSet(&parts, &self.variables, ctx);
+            return executeCommandSet(&parts, &self.variables, current_output_tag);
         } else if (std.mem.eql(u8, part, "clear-local")) {
-            return executeCommandClearLocal(&parts, &self.variables, ctx);
+            return executeCommandClearLocal(&parts, &self.variables, current_output_tag);
         } else if (std.mem.eql(u8, part, "clear-all-local")) {
             return executeCommandClearAllLocal(&parts, &self.variables);
         } else {
@@ -291,17 +297,7 @@ pub const Config = struct {
     }
 };
 
-fn getFocusedOutputName(ctx: *main.Context) ?u32 {
-    const focused_output = ctx.seat.?.focused_output orelse return null;
-    return focused_output.name;
-}
-
-fn getCurrentTags(ctx: *main.Context) ?u32 {
-    const focused_output = ctx.seat.?.focused_output orelse return null;
-    return focused_output.tags;
-}
-
-fn executeCommandSet(parts: *StringTokenIterator, variables: *Variables, ctx: *main.Context) !Result {
+fn executeCommandSet(parts: *StringTokenIterator, variables: *Variables, current_output_tag: OutputAndTags) !Result {
     var variable_type_str = parts.next() orelse return Result{ .err = "Premature end of command after 'set', expecting type or 'global'" };
     var global = false;
     if (std.mem.eql(u8, variable_type_str, "global")) {
@@ -315,8 +311,8 @@ fn executeCommandSet(parts: *StringTokenIterator, variables: *Variables, ctx: *m
 
     const operator = std.meta.stringToEnum(Operator, operator_str) orelse return Result{ .err = "Unknown operator" };
 
-    const focused_output = if (global) null else getFocusedOutputName(ctx);
-    const current_tags = if (global) null else getCurrentTags(ctx);
+    const focused_output = if (global) null else current_output_tag.output_name;
+    const current_tags = if (global) null else current_output_tag.tags;
 
     const old_value_opt = variables.get(variable_name, current_tags, focused_output);
     if (old_value_opt) |old_value| {
@@ -336,18 +332,17 @@ fn executeCommandSet(parts: *StringTokenIterator, variables: *Variables, ctx: *m
     return Result{ .ok = {} };
 }
 
-fn executeCommandClearLocal(parts: *StringTokenIterator, variables: *Variables, ctx: *main.Context) !Result {
+fn executeCommandClearLocal(parts: *StringTokenIterator, variables: *Variables, current_output_tag: OutputAndTags) Result {
     const variable_name = parts.next() orelse return Result{ .err = "Premature end of command after 'clear-local', expecting name" };
 
-    const focused_output = getFocusedOutputName(ctx) orelse return Result{ .err = "No focused output is not registered" };
-    const current_tags = getCurrentTags(ctx) orelse unreachable;
+    if (current_output_tag.output_name == null) return Result{ .err = "Focused output is not registered" };
 
-    variables.remove(variable_name, current_tags, focused_output);
+    variables.remove(variable_name, current_output_tag.tags, current_output_tag.output_name);
 
     return Result{ .ok = {} };
 }
 
-fn executeCommandClearAllLocal(parts: *StringTokenIterator, variables: *Variables) !Result {
+fn executeCommandClearAllLocal(parts: *StringTokenIterator, variables: *Variables) Result {
     const variable_name = parts.next() orelse return Result{ .err = "Premature end of command after 'clear-all-local', expecting name" };
 
     variables.removeAllLocal(variable_name);
@@ -409,7 +404,25 @@ fn newVariableValueInteger(operator: Operator, parts: *StringTokenIterator, old_
                 return .{ .err = "Cannot subtract from variable: variable not yet set" };
             }
         },
-        else => return .{ .err = "Unsupported operator for boolean variable" },
+        .@"@" => {
+            if (old_value_opt) |old_value| {
+                std.debug.assert(@as(VarTag, old_value) == VarTag.integer);
+                var value = parsed_value;
+                while (value != old_value.integer) {
+                    const next_value_str = parts.next() orelse
+                        // Current value is not in cycle list, return first of cycle list
+                        return .{ .ok = Var{ .integer = parsed_value } };
+                    value = std.fmt.parseInt(i32, next_value_str, 10) catch return .{ .err = "Invalid integer value (signed 32-bit integer)" };
+                }
+                const next_value_str = parts.next() orelse
+                    // Current value is last of cycle list, return first of cycle list
+                    return .{ .ok = Var{ .integer = parsed_value } };
+                value = std.fmt.parseInt(i32, next_value_str, 10) catch return .{ .err = "Invalid integer value (signed 32-bit integer)" };
+                return .{ .ok = Var{ .integer = value } };
+            } else {
+                return .{ .ok = Var{ .integer = parsed_value } };
+            }
+        },
     }
 }
 
@@ -426,28 +439,48 @@ test {
     defer cfg.deinit();
     var variables = &cfg.variables;
 
-    const result1 = try cfg.executeCommand("set integer main-count = 3");
+    const result1 = try cfg.executeCommand("set integer main-count = 3", .{});
     try std.testing.expectEqual(Result{ .ok = {} }, result1);
     const main_count1 = variables.get("main-count", 0, 0).?;
     try std.testing.expectEqual(@as(i32, 3), main_count1.integer);
 
-    const result2 = try cfg.executeCommand("set integer main-count = 1");
+    const result2 = try cfg.executeCommand("set integer main-count = 1", .{});
     try std.testing.expectEqual(Result{ .ok = {} }, result2);
     const main_count2 = variables.get("main-count", 0, 0).?;
     try std.testing.expectEqual(@as(i32, 1), main_count2.integer);
 
-    const result3 = try cfg.executeCommand("set string override-layout = main-center");
+    const result3 = try cfg.executeCommand("set string override-layout = main-center", .{});
     try std.testing.expectEqual(Result{ .ok = {} }, result3);
     const override_layout1 = variables.get("override-layout", 0, 0).?;
     try std.testing.expectEqualStrings("main-center", override_layout1.string);
 
-    const result4 = try cfg.executeCommand("set string override-layout = main-left");
+    const result4 = try cfg.executeCommand("set string override-layout = main-left", .{});
     try std.testing.expectEqual(Result{ .ok = {} }, result4);
     const override_layout2 = variables.get("override-layout", 0, 0).?;
     try std.testing.expectEqualStrings("main-left", override_layout2.string);
 
-    const result5 = try cfg.executeCommand("set boolean collapse = true");
+    const result5 = try cfg.executeCommand("set boolean collapse = true", .{});
     try std.testing.expectEqual(Result{ .ok = {} }, result5);
     const collapse1 = variables.get("collapse", 0, 0).?;
     try std.testing.expectEqual(true, collapse1.boolean);
+
+    const result6 = try cfg.executeCommand("set integer column-count @ 1 3 2", .{});
+    try std.testing.expectEqual(Result{ .ok = {} }, result6);
+    const column_count1 = variables.get("column-count", 0, 0).?;
+    try std.testing.expectEqual(1, column_count1.integer);
+
+    const result7 = try cfg.executeCommand("set integer column-count @ 1 3 2", .{});
+    try std.testing.expectEqual(Result{ .ok = {} }, result7);
+    const column_count2 = variables.get("column-count", 0, 0).?;
+    try std.testing.expectEqual(3, column_count2.integer);
+
+    const result8 = try cfg.executeCommand("set integer column-count @ 1 3 2", .{});
+    try std.testing.expectEqual(Result{ .ok = {} }, result8);
+    const column_count3 = variables.get("column-count", 0, 0).?;
+    try std.testing.expectEqual(2, column_count3.integer);
+
+    const result9 = try cfg.executeCommand("set integer column-count @ 1 3 2", .{});
+    try std.testing.expectEqual(Result{ .ok = {} }, result9);
+    const column_count4 = variables.get("column-count", 0, 0).?;
+    try std.testing.expectEqual(1, column_count4.integer);
 }

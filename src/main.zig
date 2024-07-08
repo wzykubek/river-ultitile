@@ -81,7 +81,7 @@ const Output = struct {
 
             .user_command => |ev| {
                 const command = mem.span(ev.command);
-                const result = cfg.executeCommand(command, &ctx) catch |err| switch (err) {
+                const result = cfg.executeCommand(command, getFocusedOutputNameAndTags()) catch |err| switch (err) {
                     error.OutOfMemory => fatal("out of memory", .{}),
                 };
                 switch (result) {
@@ -112,6 +112,14 @@ fn findOutput(output: *wl.Output) ?*Output {
         }
     }
     return null;
+}
+
+fn getFocusedOutputNameAndTags() config.OutputAndTags {
+    const focused_output = ctx.seat.?.focused_output orelse return .{};
+    return .{
+        .output_name = focused_output.name,
+        .tags = focused_output.tags,
+    };
 }
 
 const Seat = struct {
