@@ -1,6 +1,5 @@
 const std = @import("std");
 const assert = std.debug.assert;
-const fs = std.fs;
 const mem = std.mem;
 
 const Scanner = @import("zig-wayland").Scanner;
@@ -11,6 +10,8 @@ const Scanner = @import("zig-wayland").Scanner;
 /// Directly after the tagged commit, the version should be bumped and the "-dev"
 /// suffix added.
 const version = "0.1.0";
+const date_pandocvar = "date:2024-07-09";
+const footer_pandocvar = std.fmt.comptimePrint("footer:river-ultitile v{s} sr.ht/~midgard/river-ultitile", .{version});
 
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
@@ -82,5 +83,6 @@ pub fn build(b: *std.Build) !void {
     exe.pie = pie;
 
     b.installArtifact(exe);
+    _ = b.run(&.{ "pandoc", "README.md", "-Vtitle:RIVER-ULTITILE", "-Vsection:1", "-V", date_pandocvar, "-V", footer_pandocvar, "-tman", "--template=default.man", "-odoc/river-ultitile.1" });
     b.installFile("doc/river-ultitile.1", "share/man/man1/river-ultitile.1");
 }
