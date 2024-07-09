@@ -93,7 +93,7 @@ riverctl map normal $mod Down  send-layout-cmd river-ultitile "set string layout
 riverctl map normal $mod Left  send-layout-cmd river-ultitile "set string layout = main"
 
 # Mod+z to change layout on all tags/outputs
-riverctl map normal $mod z spawn "riverctl send-layout-cmd river-ultitile 'unset-all-local layout'; riverctl send-layout-cmd river-ultitile 'set global string layout @ main hstack vstack'"
+riverctl map normal $mod E spawn "riverctl send-layout-cmd river-ultitile 'unset-all-local layout'; riverctl send-layout-cmd river-ultitile 'set global string layout @ main hstack vstack'"
 ```
 
 ### Configuring layouts
