@@ -20,7 +20,7 @@ pub fn layoutSpecification(allocator: std.mem.Allocator, variables: *config.Vari
     const inner_gaps = 5;
     const outer_gaps = 5;
 
-    if (view_count == 1 and (layout != .main or usable_width <= min_width_for_center_main)) {
+    if (view_count == 1 and (layout != .main or usable_width < min_width_for_center_main)) {
         var root = try config.Tile.init(allocator, "root");
         root.max_views = null;
         return root;
