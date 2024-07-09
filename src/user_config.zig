@@ -5,6 +5,7 @@ const config = @import("config.zig");
 pub fn setDefaultVariables(variables: *config.Variables) !void {
     try variables.putDefault("layout", config.Var{ .string = try variables.allocator.dupe(u8, "main") });
     try variables.putDefault("main-size", config.Var{ .integer = 60 });
+    try variables.putDefault("main-size-if-only-centered-main", config.Var{ .integer = 80 });
     try variables.putDefault("main-count", config.Var{ .integer = 1 });
 }
 
@@ -27,19 +28,22 @@ pub fn layoutSpecification(allocator: std.mem.Allocator, variables: *config.Vari
 
     switch (layout) {
         .main => {
-            const main_size: u32 = @max(0, variables.getInteger("main-size", tags, output_name) orelse return error.UnknownVariable);
             const main_count: u31 = @max(0, variables.getInteger("main-count", tags, output_name) orelse return error.UnknownVariable);
+
+            const normal_main_size: u32 = @min(100, @max(0, variables.getInteger("main-size", tags, output_name) orelse return error.UnknownVariable));
+            const main_size_if_only_centered_main: u31 = @min(100, @max(0, variables.getInteger("main-size-if-only-centered-main", tags, output_name) orelse return error.UnknownVariable));
+            const applicable_main_size = if (view_count > main_count or usable_width < min_width_for_center_main) normal_main_size else main_size_if_only_centered_main;
 
             var root = try config.Tile.init(allocator, "root");
             root.margin = outer_gaps;
             root.padding = inner_gaps;
 
-            if (usable_width > min_width_for_center_main) {
+            if (usable_width >= min_width_for_center_main) {
                 var left = try root.addSubtile("left");
                 left.max_views = null;
                 left.order = 1;
                 left.suborder = 0;
-                left.stretch = if (view_count <= main_count) 80 -| main_size else 100 - main_size;
+                left.stretch = 100 -| applicable_main_size;
                 left.typ = config.TileType.vsplit;
             }
 
@@ -47,13 +51,13 @@ pub fn layoutSpecification(allocator: std.mem.Allocator, variables: *config.Vari
             main.typ = .vsplit;
             main.max_views = main_count;
             main.order = 0;
-            main.stretch = main_size;
+            main.stretch = applicable_main_size;
 
             var right = try root.addSubtile("right");
             right.max_views = null;
             right.order = 1;
             right.suborder = 1;
-            right.stretch = if (view_count <= main_count) 80 -| main_size else 100 - main_size;
+            right.stretch = 100 -| applicable_main_size;
             right.typ = config.TileType.vsplit;
 
             return root;

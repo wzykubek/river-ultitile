@@ -78,21 +78,25 @@ riverctl default-layout river-ultitile
 river-ultitile &
 
 # These keybinds work with the default river-ultitile configuration
-# Mod+U and Mod+I to increase/decrease the main size
-riverctl map normal $mod U send-layout-cmd river-ultitile "set integer main-size += 5"
-riverctl map normal $mod I send-layout-cmd river-ultitile "set integer main-size -= 5"
+# Increase/decrease the main size
+riverctl map normal $mod U send-layout-cmd river-ultitile "set integer main-size += 4"
+riverctl map normal $mod I send-layout-cmd river-ultitile "set integer main-size -= 4"
 
-# Mod+Shift+U and Mod+Shift+I to decrease/increase the main count
-riverctl map normal $mod+Shift U send-layout-cmd river-ultitile "set integer main-count -= 1"
-riverctl map normal $mod+Shift I send-layout-cmd river-ultitile "set integer main-count += 1"
+# Decrease/increase the main size if it is in the center (on wide screens)
+riverctl map normal $mod+Shift U send-layout-cmd river-ultitile "set integer main-size-if-only-centered-main += 4"
+riverctl map normal $mod+Shift I send-layout-cmd river-ultitile "set integer main-size-if-only-centered-main -= 4"
 
-# Mod+{Up,Right,Down,Left} to change layout
+# Decrease/increase the main count
+riverctl map normal $mod N send-layout-cmd river-ultitile "set integer main-count -= 1"
+riverctl map normal $mod M send-layout-cmd river-ultitile "set integer main-count += 1"
+
+# Change layout
 riverctl map normal $mod Up    send-layout-cmd river-ultitile "set string layout = vstack"
 riverctl map normal $mod Right send-layout-cmd river-ultitile "set string layout = hstack"
 riverctl map normal $mod Down  send-layout-cmd river-ultitile "set string layout = monocle"
 riverctl map normal $mod Left  send-layout-cmd river-ultitile "set string layout = main"
 
-# Mod+z to change layout on all tags/outputs
+# Cycle through layouts on all tags/outputs
 riverctl map normal $mod E spawn "riverctl send-layout-cmd river-ultitile 'unset-all-local layout'; riverctl send-layout-cmd river-ultitile 'set global string layout @ main hstack vstack'"
 ```
 
