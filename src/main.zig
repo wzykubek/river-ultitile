@@ -27,7 +27,6 @@ const flags = @import("flags");
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
 const river = wayland.client.river;
-const zriver = wayland.client.zriver;
 
 const layout = @import("layout.zig");
 const user_config = @import("user_config.zig");
@@ -50,10 +49,7 @@ const usage =
 
 pub const Context = struct {
     layout_manager: ?*river.LayoutManagerV3 = null,
-    status_manager: ?*zriver.StatusManagerV1 = null,
     outputs: std.SinglyLinkedList(Output) = .{},
-    // XXX Assumes there's only a single seat -- unclear how the river-layout protocol would have to work with multiple seats anyway
-    seat: ?Seat = null,
     initialized: bool = false,
 };
 
@@ -81,7 +77,7 @@ const Output = struct {
 
             .user_command => |ev| {
                 const command = mem.span(ev.command);
-                const result = cfg.executeCommand(command, getFocusedOutputNameAndTags()) catch |err| switch (err) {
+                const result = cfg.executeCommand(command, .{ .output_name = output.name, .tags = output.tags }) catch |err| switch (err) {
                     error.OutOfMemory => fatal("out of memory", .{}),
                 };
                 switch (result) {
@@ -100,55 +96,6 @@ const Output = struct {
                     return;
                 };
             },
-        }
-    }
-};
-
-fn findOutput(output: *wl.Output) ?*Output {
-    var it = ctx.outputs.first;
-    while (it) |node| : (it = node.next) {
-        if (node.data.wl_output == output) {
-            return &node.data;
-        }
-    }
-    return null;
-}
-
-fn getFocusedOutputNameAndTags() config.OutputAndTags {
-    const focused_output = ctx.seat.?.focused_output orelse return .{};
-    return .{
-        .output_name = focused_output.name,
-        .tags = focused_output.tags,
-    };
-}
-
-const Seat = struct {
-    wl_seat: *wl.Seat,
-    name: u32,
-
-    focused_output: ?*Output = null,
-
-    fn getRiverSeatStatus(self: *Seat) !void {
-        const status_manager = try ctx.status_manager.?.getRiverSeatStatus(ctx.seat.?.wl_seat);
-        status_manager.setListener(*Seat, seatListener, self);
-        log.info("Tracking active output from seat {}\n", .{ctx.seat.?.name});
-    }
-
-    fn seatListener(layout_proto: *zriver.SeatStatusV1, event: zriver.SeatStatusV1.Event, seat: *Seat) void {
-        _ = layout_proto;
-        switch (event) {
-            .focused_output => |ev| if (ev.output) |output| {
-                seat.focused_output = findOutput(output);
-                if (seat.focused_output) |focused_output| {
-                    log.debug("Now focused: output {}\n", .{focused_output.name});
-                } else {
-                    log.debug("Now focused: unregistered output (null) :?\n", .{});
-                }
-            } else {
-                log.debug("Focus on output {?} lost\n", .{seat.focused_output});
-                seat.focused_output = null;
-            },
-            else => {},
         }
     }
 };
@@ -219,18 +166,12 @@ pub fn main() !void {
         fatal("Wayland compositor does not support river_layout_v3.\n", .{});
     }
 
-    if (ctx.status_manager == null) {
-        fatal("Wayland compositor does not support zriver_status_unstable_v1.\n", .{});
-    }
-
     ctx.initialized = true;
 
     var it = ctx.outputs.first;
     while (it) |node| : (it = node.next) {
         try node.data.getLayout();
     }
-
-    if (ctx.initialized) try ctx.seat.?.getRiverSeatStatus();
 
     while (true) {
         const dispatch_errno = display.dispatch();
@@ -255,8 +196,6 @@ fn registryEvent(context: *Context, registry: *wl.Registry, event: wl.Registry.E
         .global => |ev| {
             if (mem.orderZ(u8, ev.interface, river.LayoutManagerV3.getInterface().name) == .eq) {
                 context.layout_manager = try registry.bind(ev.name, river.LayoutManagerV3, 2);
-            } else if (mem.orderZ(u8, ev.interface, zriver.StatusManagerV1.getInterface().name) == .eq) {
-                context.status_manager = try registry.bind(ev.name, zriver.StatusManagerV1, 4);
             } else if (mem.orderZ(u8, ev.interface, wl.Output.getInterface().name) == .eq) {
                 const wl_output = try registry.bind(ev.name, wl.Output, 4);
                 errdefer wl_output.release();
@@ -272,16 +211,6 @@ fn registryEvent(context: *Context, registry: *wl.Registry, event: wl.Registry.E
 
                 if (ctx.initialized) try node.data.getLayout();
                 context.outputs.prepend(node);
-            } else if (mem.orderZ(u8, ev.interface, wl.Seat.getInterface().name) == .eq) {
-                const wl_seat = try registry.bind(ev.name, wl.Seat, 4);
-                errdefer wl_seat.release();
-
-                ctx.seat = .{
-                    .wl_seat = wl_seat,
-                    .name = ev.name,
-                };
-
-                if (ctx.initialized) try ctx.seat.?.getRiverSeatStatus();
             }
         },
         .global_remove => |ev| {
