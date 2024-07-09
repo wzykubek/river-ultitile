@@ -9,9 +9,7 @@ const Scanner = @import("zig-wayland").Scanner;
 /// tagged, the "-dev" suffix should be removed for the commit that gets tagged.
 /// Directly after the tagged commit, the version should be bumped and the "-dev"
 /// suffix added.
-const version = "0.1.0";
-const date_pandocvar = "date:2024-07-09";
-const footer_pandocvar = std.fmt.comptimePrint("footer:river-ultitile v{s} sr.ht/~midgard/river-ultitile", .{version});
+const version = "1.0.0-dev";
 
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
@@ -20,9 +18,9 @@ pub fn build(b: *std.Build) !void {
     const pie = b.option(bool, "pie", "Build a Position Independent Executable") orelse false;
 
     const full_version = blk: {
-        if (mem.endsWith(u8, version, "-dev")) {
-            var ret: u8 = undefined;
+        var ret: u8 = undefined;
 
+        if (mem.endsWith(u8, version, "-dev")) {
             const git_describe_long = b.runAllowFail(
                 &[_][]const u8{ "git", "-C", b.build_root.path orelse ".", "describe", "--long" },
                 &ret,
@@ -42,8 +40,27 @@ pub fn build(b: *std.Build) !void {
                 commit_hash[1..],
             });
         } else {
-            break :blk version;
+            const git_describe = b.runAllowFail(
+                &[_][]const u8{ "git", "-C", b.build_root.path orelse ".", "describe" },
+                &ret,
+                .Inherit,
+            ) catch break :blk version;
+            if (mem.eql(u8, git_describe, version)) {
+                break :blk version;
+            } else {
+                std.debug.print("version does not match git tag\n", .{});
+                std.process.exit(1);
+            }
         }
+    };
+    const date = blk: {
+        var ret: u8 = undefined;
+
+        break :blk b.runAllowFail(
+            &.{ "date", "--utc", "+%Y-%m-%d" },
+            &ret,
+            .Inherit,
+        ) catch "unknown";
     };
 
     const options = b.addOptions();
@@ -83,6 +100,10 @@ pub fn build(b: *std.Build) !void {
     exe.pie = pie;
 
     b.installArtifact(exe);
-    _ = b.run(&.{ "pandoc", "README.md", "-Vtitle:RIVER-ULTITILE", "-Vsection:1", "-V", date_pandocvar, "-V", footer_pandocvar, "-tman", "--template=default.man", "-odoc/river-ultitile.1" });
+
+    const command = try std.fmt.allocPrint(b.allocator, "sed 's|\\[CONTRIBUTING.md\\]|https://git.sr.ht/~midgard/river-ultitile/tree/main/item/CONTRIBUTING.md|g' README.md | " ++
+        "pandoc -fmarkdown -Vtitle:RIVER-ULTITILE -Vsection:1 -Vdate:'{s}' -Vfooter:'river-ultitile {s}' -tman --template=default.man -odoc/river-ultitile.1", .{ date, full_version });
+
+    _ = b.run(&.{ "sh", "-c", command });
     b.installFile("doc/river-ultitile.1", "share/man/man1/river-ultitile.1");
 }

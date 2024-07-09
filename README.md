@@ -144,6 +144,9 @@ Files in `common/` and `protocol/` directories are released under various
 licenses by various parties. You should refer to the copyright block of each
 files for the licensing information.
 
+## URLs
+Project homepage: https://sr.ht/~midgard/river-ultitile/
+
 [river]: https://codeberg.org/river/river
 [zig]: https://ziglang.org/download/
 [contributing.md]: CONTRIBUTING.md
