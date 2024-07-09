@@ -1,0 +1,37 @@
+#!/bin/sh
+
+set -eu
+cd "$(dirname "$0")"
+
+prev_version="$(git describe --tags --abbrev=0 || echo none)"
+printf 'Previous version:     %s\n' "$prev_version"
+new_version="$(sed -En 's/^const version = "(.*)-dev";$/\1/p' build.zig)"
+printf 'New version? (v%s) v' "$new_version"
+read version
+if [ -z "$version" ]; then
+	version="$new_version"
+fi
+
+tagid=v"$version"
+if [ "$version" != "$prev_version" ]; then
+	sed -i 's/const version = ".*";/const version = "'"$version"'";/' build.zig
+	sed -i 's/## \[Unreleased\]/&\n### Added\n### Changed\n### Deprecated\n### Removed\n### Fixed\n### Security\n\n## ['"$version"'] - '"$(date --utc +%Y-%m-%d)"'/' CHANGELOG.md
+	echo; echo "Inspect CHANGELOG..."
+	${EDITOR:-nano} CHANGELOG.md
+	git add build.zig CHANGELOG.md
+	git commit -m "build: Release version $version"
+
+	echo "Creating git tag $tagid"
+	git tag -s -m "Version $version" "$tagid"
+
+	sed -i 's/const version = ".*";/const version = "'"$version"'";/' build.zig
+
+	printf 'Next version? v'
+	read next_version
+	sed -i 's/const version = ".*";/const version = "'"$next_version"'-dev";/' build.zig
+	git add build.zig
+	git commit -m "build: Bump to version $next_version-dev"
+	printf "\n\nRemember to 'git push origin %s'\n" "$tagid"
+else
+	echo "Version already created"
+fi
