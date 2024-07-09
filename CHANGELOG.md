@@ -6,13 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Default layouts: add `main-size-if-only-centered-main` variable
 ### Changed
 ### Deprecated
 ### Removed
 ### Fixed
-- Default layouts: fix width of multiple main views in main layout on non-widescreens
 ### Security
+
+## [1.1.0] - 2024-07-09
+### Added
+- Default layouts: add `main-size-if-only-centered-main` variable
+### Fixed
+- Default layouts: fix width of multiple main views in main layout on non-widescreens
 
 ## [1.0.0] - 2024-07-09
 Initial release
