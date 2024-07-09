@@ -362,11 +362,14 @@ fn parseBoolean(value_str: []const u8) ?bool {
     return if (std.mem.eql(u8, value_str, "true")) true else if (std.mem.eql(u8, value_str, "false")) false else null;
 }
 
+const spurious_arguments = "Command has spurious arguments after value (this operator supports only a single value)";
+
 fn newVariableValueBoolean(operator: Operator, parts: *StringTokenIterator, old_value_opt: ?Var) util.Result(Var, []const u8) {
     const value_str = parts.next() orelse return .{ .err = "Premature end of command after operator, expecting value" };
     const parsed_value = parseBoolean(value_str) orelse return .{ .err = "Invalid boolean value" };
     switch (operator) {
         .@"=" => {
+            if (parts.next() != null) return .{ .err = spurious_arguments };
             return .{ .ok = Var{ .boolean = parsed_value } };
         },
         .@"@" => {
@@ -386,9 +389,11 @@ fn newVariableValueInteger(operator: Operator, parts: *StringTokenIterator, old_
     const first_value = std.fmt.parseInt(i32, value_str, 10) catch return .{ .err = "Invalid integer value (signed 32-bit integer)" };
     switch (operator) {
         .@"=" => {
+            if (parts.next() != null) return .{ .err = spurious_arguments };
             return .{ .ok = Var{ .integer = first_value } };
         },
         .@"+=" => {
+            if (parts.next() != null) return .{ .err = spurious_arguments };
             if (old_value_opt) |old_value| {
                 std.debug.assert(@as(VarTag, old_value) == VarTag.integer);
                 return .{ .ok = Var{ .integer = old_value.integer +| first_value } };
@@ -397,6 +402,7 @@ fn newVariableValueInteger(operator: Operator, parts: *StringTokenIterator, old_
             }
         },
         .@"-=" => {
+            if (parts.next() != null) return .{ .err = spurious_arguments };
             if (old_value_opt) |old_value| {
                 std.debug.assert(@as(VarTag, old_value) == VarTag.integer);
                 return .{ .ok = Var{ .integer = old_value.integer -| first_value } };
@@ -430,6 +436,7 @@ fn newVariableValueString(allocator: std.mem.Allocator, operator: Operator, part
     const first_value = parts.next() orelse return .{ .err = "Premature end of command after operator, expecting value" };
     switch (operator) {
         .@"=" => {
+            if (parts.next() != null) return .{ .err = spurious_arguments };
             return .{ .ok = Var{ .string = try allocator.dupe(u8, first_value) } };
         },
         .@"@" => {
