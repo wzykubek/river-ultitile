@@ -16,6 +16,8 @@ pub fn layoutSpecification(allocator: std.mem.Allocator, variables: *config.Vari
     const layout = std.meta.stringToEnum(Layout, variables.getString("layout", tags, output_name) orelse return error.UnknownVariable) orelse return error.UnknownLayout;
 
     const min_width_for_center_main = 2200;
+    const inner_gaps = 5;
+    const outer_gaps = 5;
 
     if (view_count == 1 and (layout != .main or usable_width <= min_width_for_center_main)) {
         var root = try config.Tile.init(allocator, "root");
@@ -29,8 +31,8 @@ pub fn layoutSpecification(allocator: std.mem.Allocator, variables: *config.Vari
             const main_count: u31 = @max(0, variables.getInteger("main-count", tags, output_name) orelse return error.UnknownVariable);
 
             var root = try config.Tile.init(allocator, "root");
-            root.margin = 5;
-            root.padding = 5;
+            root.margin = outer_gaps;
+            root.padding = inner_gaps;
 
             if (usable_width > min_width_for_center_main) {
                 var left = try root.addSubtile("left");
@@ -60,8 +62,8 @@ pub fn layoutSpecification(allocator: std.mem.Allocator, variables: *config.Vari
         .hstack => {
             var root = try config.Tile.init(allocator, "root");
             root.max_views = null;
-            root.margin = 5;
-            root.padding = 5;
+            root.margin = outer_gaps;
+            root.padding = inner_gaps;
             return root;
         },
 
@@ -69,8 +71,8 @@ pub fn layoutSpecification(allocator: std.mem.Allocator, variables: *config.Vari
             var root = try config.Tile.init(allocator, "root");
             root.typ = .vsplit;
             root.max_views = null;
-            root.margin = 5;
-            root.padding = 5;
+            root.margin = outer_gaps;
+            root.padding = inner_gaps;
             return root;
         },
 
