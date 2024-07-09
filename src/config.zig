@@ -287,10 +287,10 @@ pub const Config = struct {
 
         if (std.mem.eql(u8, part, "set")) {
             return executeCommandSet(&parts, &self.variables, current_output_tag);
-        } else if (std.mem.eql(u8, part, "clear-local")) {
-            return executeCommandClearLocal(&parts, &self.variables, current_output_tag);
-        } else if (std.mem.eql(u8, part, "clear-all-local")) {
-            return executeCommandClearAllLocal(&parts, &self.variables);
+        } else if (std.mem.eql(u8, part, "unset-local")) {
+            return executeCommandUnsetLocal(&parts, &self.variables, current_output_tag);
+        } else if (std.mem.eql(u8, part, "unset-all-local")) {
+            return executeCommandUnsetAllLocal(&parts, &self.variables);
         } else {
             return Result{ .err = "Unrecognized first word of command" };
         }
@@ -332,8 +332,8 @@ fn executeCommandSet(parts: *StringTokenIterator, variables: *Variables, current
     return Result{ .ok = {} };
 }
 
-fn executeCommandClearLocal(parts: *StringTokenIterator, variables: *Variables, current_output_tag: OutputAndTags) Result {
-    const variable_name = parts.next() orelse return Result{ .err = "Premature end of command after 'clear-local', expecting name" };
+fn executeCommandUnsetLocal(parts: *StringTokenIterator, variables: *Variables, current_output_tag: OutputAndTags) Result {
+    const variable_name = parts.next() orelse return Result{ .err = "Premature end of command after 'unset-local', expecting name" };
 
     if (current_output_tag.output_name == null) return Result{ .err = "Focused output is not registered" };
 
@@ -342,8 +342,8 @@ fn executeCommandClearLocal(parts: *StringTokenIterator, variables: *Variables, 
     return Result{ .ok = {} };
 }
 
-fn executeCommandClearAllLocal(parts: *StringTokenIterator, variables: *Variables) Result {
-    const variable_name = parts.next() orelse return Result{ .err = "Premature end of command after 'clear-all-local', expecting name" };
+fn executeCommandUnsetAllLocal(parts: *StringTokenIterator, variables: *Variables) Result {
+    const variable_name = parts.next() orelse return Result{ .err = "Premature end of command after 'unset-all-local', expecting name" };
 
     variables.removeAllLocal(variable_name);
 
