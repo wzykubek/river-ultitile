@@ -53,12 +53,14 @@ pub fn layoutSpecification(allocator: std.mem.Allocator, variables: *config.Vari
             main.order = 0;
             main.stretch = applicable_main_size;
 
-            var right = try root.addSubtile("right");
-            right.max_views = null;
-            right.order = 1;
-            right.suborder = 1;
-            right.stretch = 100 -| applicable_main_size;
-            right.typ = config.TileType.vsplit;
+            if (usable_width >= min_width_for_center_main or view_count > main_count) {
+                var right = try root.addSubtile("right");
+                right.max_views = null;
+                right.order = 1;
+                right.suborder = 1;
+                right.stretch = 100 -| applicable_main_size;
+                right.typ = config.TileType.vsplit;
+            }
 
             return root;
         },

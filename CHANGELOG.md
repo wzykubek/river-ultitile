@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 ### Removed
 ### Fixed
+- Default layouts: fix width of multiple main views in main layout on non-widescreens
 ### Security
 
 ## [1.0.0] - 2024-07-09
