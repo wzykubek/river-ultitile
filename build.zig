@@ -45,7 +45,7 @@ pub fn build(b: *std.Build) !void {
                 &ret,
                 .Inherit,
             ) catch break :blk version;
-            if (mem.eql(u8, git_describe, version)) {
+            if (mem.eql(u8, git_describe, "v" ++ version ++ "\n")) {
                 break :blk version;
             } else {
                 std.debug.print("version does not match git tag\n", .{});
