@@ -18,9 +18,16 @@ Requirements:
 - [Zig] 0.12
 - [wayland-protocols]
 
+Download the sources with
+
+    git clone https://git.sr.ht/~midgard/river-ultitile -b v1.1.0
+
 Build with e.g.
 
+    cd river-ultitile
     zig build -Doptimize=ReleaseSafe --prefix ~/.local
+
+And make sure ~/.local/bin is in your path.
 
 ## Quick start
 Integrate the [snippet](#Example_river_init_file) into your river init file and look at the key

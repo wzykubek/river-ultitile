@@ -15,10 +15,11 @@ fi
 tagid=v"$version"
 if [ "$version" != "$prev_version" ]; then
 	sed -i 's/const version = ".*";/const version = "'"$version"'";/' build.zig
+	sed -Ei 's/(.*git clone .* -b ).*/\1'"$tagid"/ README.md
 	sed -i 's/## \[Unreleased\]/&\n### Added\n### Changed\n### Deprecated\n### Removed\n### Fixed\n### Security\n\n## ['"$version"'] - '"$(date --utc +%Y-%m-%d)"'/' CHANGELOG.md
 	echo; echo "Inspect CHANGELOG..."
 	${EDITOR:-nano} CHANGELOG.md
-	git add build.zig CHANGELOG.md
+	git add build.zig CHANGELOG.md README.md
 	git commit -m "build: Release version $version"
 
 	echo "Creating git tag $tagid"
