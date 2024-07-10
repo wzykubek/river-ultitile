@@ -22,7 +22,22 @@ if [ "$version" != "$prev_version" ]; then
 	git commit -m "build: Release version $version"
 
 	echo "Creating git tag $tagid"
-	git tag -s -m "Version $version" "$tagid"
+
+	sed -n '/^## \['"$version"'\]/,/^## \[/p' CHANGELOG.md | sed '1s/^.*$/Version '"$version"'\n/;/^$/d;s/^##* //;;$s/^.*$//' |
+		git tag -s "$tagid" -F -
+
+	fail() {
+		git tag -d "$tagid"
+		echo "Failed, remove the last commit with 'git reset --hard HEAD^'"
+		exit 1
+	}
+
+	echo "Testing build"
+	zig build || fail
+	echo "Running tests"
+	zig test src/util.zig || fail
+	zig test src/config.zig || fail
+	zig test src/layout.zig || fail
 
 	sed -i 's/const version = ".*";/const version = "'"$version"'";/' build.zig
 
