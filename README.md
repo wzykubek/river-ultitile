@@ -66,8 +66,8 @@ riverctl map normal $mod+Shift U send-layout-cmd river-ultitile "set integer mai
 riverctl map normal $mod+Shift I send-layout-cmd river-ultitile "set integer main-size-if-only-centered-main -= 4"
 
 # Decrease/increase the main count
-riverctl map normal $mod N send-layout-cmd river-ultitile "set integer main-count -= 1"
-riverctl map normal $mod M send-layout-cmd river-ultitile "set integer main-count += 1"
+riverctl map normal $mod N send-layout-cmd river-ultitile "set integer main-count += 1"
+riverctl map normal $mod M send-layout-cmd river-ultitile "set integer main-count -= 1"
 
 # Change layout
 riverctl map normal $mod Up    send-layout-cmd river-ultitile "set string layout = vstack"
