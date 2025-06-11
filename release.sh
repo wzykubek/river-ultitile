@@ -1,7 +1,5 @@
 #!/bin/sh
 
-zig="zig-0.14.0"
-
 set -eu
 cd "$(dirname "$0")"
 
@@ -37,11 +35,9 @@ if [ "v$version" != "$prev_version" ]; then
 	}
 
 	echo "Testing build"
-	$zig build || fail
+	make build || fail
 	echo "Running tests"
-	$zig test src/util.zig || fail
-	$zig test src/config.zig || fail
-	$zig test src/layout.zig || fail
+	make test || fail
 
 	sed -i 's/const version = ".*";/const version = "'"$version"'";/' build.zig
 

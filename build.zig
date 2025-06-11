@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const assert = std.debug.assert;
 const mem = std.mem;
 
@@ -10,6 +11,12 @@ const Scanner = @import("wayland").Scanner;
 /// Directly after the tagged commit, the version should be bumped and the "-dev"
 /// suffix added.
 const version = "1.3.1-dev";
+
+const zig_major = 0;
+const zig_minor = 14;
+comptime {
+    std.debug.assert(builtin.zig_version.major == zig_major and builtin.zig_version.minor == zig_minor);
+}
 
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
