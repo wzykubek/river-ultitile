@@ -13,7 +13,7 @@ if [ -z "$version" ]; then
 fi
 
 tagid=v"$version"
-if [ "$version" != "$prev_version" ]; then
+if [ "v$version" != "$prev_version" ]; then
 	sed -i 's/const version = ".*";/const version = "'"$version"'";/' build.zig
 	sed -i 's/\.version = ".*",/.version = "'"$version"'",/' build.zig.zon
 	sed -Ei 's/(.*git clone .* -b ).*/\1'"$tagid"/ README.md
@@ -52,4 +52,5 @@ if [ "$version" != "$prev_version" ]; then
 	printf "\n\nRemember to 'git push origin %s'\n" "$tagid"
 else
 	echo "Version already created"
+	exit 1
 fi
