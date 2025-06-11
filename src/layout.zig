@@ -84,9 +84,18 @@ fn highestSuborder(tile: *const Tile) u32 {
     return result;
 }
 
-fn buildFillingInfoInner(allocator: std.mem.Allocator, tile: *const Tile, parent_tile_info: ?*TileInfo, out_order_suborder_map: [][]?*TileInfo, out_tile_infos: *std.ArrayList(TileInfo)) !*TileInfo {
-    var tile_info = try out_tile_infos.addOne();
-    tile_info.* = TileInfo{
+/// Count the number of subtiles
+fn recursiveSubtileCount(tile: *const Tile) u32 {
+    var result: u32 = 0;
+    for (tile.subtiles.items) |*subtile| {
+        result += 1 + recursiveSubtileCount(subtile);
+    }
+    return result;
+}
+
+fn buildFillingInfoInner(allocator: std.mem.Allocator, tile: *const Tile, parent_tile_info: ?*TileInfo, out_order_suborder_map: [][]?*TileInfo, out_tile_infos: []TileInfo, in_out_tile_infos_i: *usize) !*TileInfo {
+    std.debug.assert(in_out_tile_infos_i.* < out_tile_infos.len);
+    out_tile_infos[in_out_tile_infos_i.*] = TileInfo{
         .allocator = allocator,
         .tile = tile,
         .subtiles = try allocator.alloc(*TileInfo, tile.subtiles.items.len),
@@ -97,18 +106,22 @@ fn buildFillingInfoInner(allocator: std.mem.Allocator, tile: *const Tile, parent
         .views_dimensions = null,
     };
 
+    const tile_info = &out_tile_infos[in_out_tile_infos_i.*];
+    in_out_tile_infos_i.* += 1;
+
     if (tile.max_views != 0) {
         out_order_suborder_map[tile.order][tile.suborder] = tile_info;
     }
 
     for (tile.subtiles.items, 0..) |*subtile, i| {
-        tile_info.subtiles[i] = try buildFillingInfoInner(allocator, subtile, tile_info, out_order_suborder_map, out_tile_infos);
+        tile_info.subtiles[i] = try buildFillingInfoInner(allocator, subtile, tile_info, out_order_suborder_map, out_tile_infos, in_out_tile_infos_i);
     }
 
     return tile_info;
 }
 
 fn buildFillingInfo(allocator: std.mem.Allocator, tile: *const Tile) !TileInfos {
+    const tile_count = recursiveSubtileCount(tile) + 1;
     const order_suborder_map = try allocator.alloc([]?*TileInfo, highestOrder(tile) + 1);
     const highest_suborder = highestSuborder(tile);
     for (order_suborder_map) |*suborder_map| {
@@ -122,11 +135,16 @@ fn buildFillingInfo(allocator: std.mem.Allocator, tile: *const Tile) !TileInfos 
         allocator.free(order_suborder_map);
     }
 
-    var tile_infos = std.ArrayList(TileInfo).init(allocator);
-    errdefer tile_infos.deinit();
-    _ = try buildFillingInfoInner(allocator, tile, null, order_suborder_map, &tile_infos);
+    const tile_infos = try allocator.alloc(TileInfo, tile_count);
+    errdefer allocator.free(tile_infos);
 
-    return TileInfos.initFromOwnedSlices(allocator, order_suborder_map, try tile_infos.toOwnedSlice());
+    if (tile_count > 0) {
+        var tile_infos_i: usize = 0;
+        _ = try buildFillingInfoInner(allocator, tile, null, order_suborder_map, tile_infos, &tile_infos_i);
+        std.debug.assert(tile_infos_i == tile_count);
+    }
+
+    return TileInfos.initFromOwnedSlices(allocator, order_suborder_map, tile_infos);
 }
 
 fn createTestLayout(allocator: std.mem.Allocator) !Tile {
