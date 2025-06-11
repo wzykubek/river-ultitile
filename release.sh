@@ -15,6 +15,7 @@ fi
 tagid=v"$version"
 if [ "$version" != "$prev_version" ]; then
 	sed -i 's/const version = ".*";/const version = "'"$version"'";/' build.zig
+	sed -i 's/\.version = ".*",/.version = "'"$version"'",/' build.zig.zon
 	sed -Ei 's/(.*git clone .* -b ).*/\1'"$tagid"/ README.md
 	sed -i 's/## \[Unreleased\]/&\n### Added\n### Changed\n### Deprecated\n### Removed\n### Fixed\n### Security\n\n## ['"$version"'] - '"$(date --utc +%Y-%m-%d)"'/' CHANGELOG.md
 	echo; echo "Inspect CHANGELOG..."
@@ -45,6 +46,7 @@ if [ "$version" != "$prev_version" ]; then
 	printf 'Next version? v'
 	read next_version
 	sed -i 's/const version = ".*";/const version = "'"$next_version"'-dev";/' build.zig
+	sed -i 's/\.version = ".*",/.version = "'"$next_version"'",/' build.zig.zon
 	git add build.zig
 	git commit -m "build: Bump to version $next_version-dev"
 	printf "\n\nRemember to 'git push origin %s'\n" "$tagid"
