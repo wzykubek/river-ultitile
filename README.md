@@ -24,7 +24,7 @@ Requirements:
 
 Download the sources with
 
-    git clone https://git.sr.ht/~midgard/river-ultitile -b v1.2.1
+    git clone https://git.sr.ht/~midgard/river-ultitile -b v1.3.0
 
 Build with e.g.
 

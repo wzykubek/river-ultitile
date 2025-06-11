@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 ### Security
 
+## [1.3.0] - 2025-06-11
+### Changed
+- Migrate to Zig 0.14
+
 ## [1.2.1] - 2025-06-11
 ### Fixed
 - Fix a possible crash due to a memory error
