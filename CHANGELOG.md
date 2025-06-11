@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
-- Migrate to Zig 0.13
-- Only log the proposed views on debug builds
 ### Deprecated
 ### Removed
 ### Fixed
-- Improve documentation in README.md some more
 ### Security
+
+## [1.2.0] - 2025-06-11
+### Changed
+- Migrate to Zig 0.13
+- Only log the proposed views on debug builds
+### Fixed
+- Improve documentation in README.md some more
 
 ## [1.1.2] - 2025-06-11
 ### Fixed
