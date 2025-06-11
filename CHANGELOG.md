@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+- Migrate to Zig 0.13
 ### Deprecated
 ### Removed
 ### Fixed

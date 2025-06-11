@@ -74,11 +74,11 @@ pub fn build(b: *std.Build) !void {
     scanner.generate("river_layout_manager_v3", 2);
 
     const wayland = b.createModule(.{ .root_source_file = scanner.result });
-    const flags = b.createModule(.{ .root_source_file = .{ .path = "common/flags.zig" } });
+    const flags = b.createModule(.{ .root_source_file = b.path("common/flags.zig") });
 
     const exe = b.addExecutable(.{
         .name = "river-ultitile",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
