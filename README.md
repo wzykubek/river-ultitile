@@ -61,7 +61,8 @@ river-ultitile &
 riverctl map normal $mod U send-layout-cmd river-ultitile "set integer main-size += 4"
 riverctl map normal $mod I send-layout-cmd river-ultitile "set integer main-size -= 4"
 
-# Decrease/increase the main size if it is in the center (on widescreens)
+# Decrease/increase the main size if it is in the center (on widescreens) and there are no views to
+# the left or right
 riverctl map normal $mod+Shift U send-layout-cmd river-ultitile "set integer main-size-if-only-centered-main += 4"
 riverctl map normal $mod+Shift I send-layout-cmd river-ultitile "set integer main-size-if-only-centered-main -= 4"
 
@@ -124,22 +125,39 @@ Tiles can have their contents arranged horizontally (`typ=.hsplit`), vertically
 (`typ=.vsplit`), or superimposed (`typ=.overlay`).
 
 Views are assigned to tiles in an order determined by the `order` property of the tiles. The
-assignment of views starts with the lower orders, so lower orders get the views on the top of the
-river view stack. Tiles with the same `order` will share the assigned views evenly. Use `suborder`
-to determine views higher on the stack will come. Having tiles with the same `order` and `suborder`
-and a non-zero `max_views` is not allowed.
+assignment of views starts with the lower orders, so order 0 gets the view on the top of the river
+view stack. To divide views evenly between tiles, give them the same `order` and use `suborder` to
+determine which tiles will be filled first. Having tiles with the same `order` and `suborder` and a
+non-zero `max_views` is not allowed.
+
+```
++---left---+--center--+--right---+
+|order=1   |order=0   |order=1   |
+|suborder=1|          |suborder=0|
+|          |maxviews=1|          |
++----------+----------+----------+
+```
+
+In this example, views are assigned in this order: center, right, left, right, left …
 
 Tile properties are:  
 - `typ=<.hsplit|.vsplit|.overlay>` (default `.hsplit`)  
-- `padding=<number|null>` (default `null`; `null` means inherit)): space around the tile's contents  
-- `margin=<number>` (default `0`): space around the tile  
-- `stretch=<number>` (default `100`): a relative width specifier. The stretches of a tile's
-    subtiles are summed, and the subtiles get a width proportional to their stretch divided by that
-    sum. Views always have a stretch of 100.  
+- `padding=<number|null>` (default `null`; `null` means inherit)): space around the tile's contents,
+    in pixels  
+- `margin=<number>` (default `0`): space around the tile, in pixels  
+- `stretch=<number>` (default `100`): a relative width\* specifier. The stretches of a tile's
+    subtiles are summed, and the subtiles get a width\* proportional to their stretch divided by
+    that sum. Views always have a stretch of 100.  
 - `order=<number>` (default `0`): see above  
 - `suborder=<number>` (default `0`): see above  
 - `max_views=<number|null>` (default `0`; `null` means unlimited): the maximum amount of views that
   will be assigned to this tile
+
+\*: or height for vsplit
+
+Of course you can also use dynamic parameters in your custom layout. The `variables` object passed
+to the `layoutSpecification` function has methods `getString`, `getInteger` and `getBoolean` for
+that. Make sure to specify a default value in `setDefaultVariables`, or `get…` will return null.
 
 ## Contributing
 
