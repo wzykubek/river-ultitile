@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 ### Security
 
+## [1.1.2] - 2025-06-11
+### Fixed
+- Improve documentation in README.md and comments in user_config.zig
+
 ## [1.1.1] - 2024-07-10
 ### Fixed
 - Fix compilation of release builds
