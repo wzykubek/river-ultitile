@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Improve documentation in README.md some more
 
+## [1.1.3] - 2025-06-11
+Backport of a fix in 1.2.1 to Zig 0.12
+### Fixed
+- Fix a possible crash due to a memory error
+
 ## [1.1.2] - 2025-06-11
 ### Fixed
 - Improve documentation in README.md and comments in user_config.zig
