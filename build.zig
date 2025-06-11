@@ -2,7 +2,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const mem = std.mem;
 
-const Scanner = @import("zig-wayland").Scanner;
+const Scanner = @import("wayland").Scanner;
 
 /// While a river-ultitile release is in development, this string should contain
 /// the version in development with the "-dev" suffix.  When a release is
@@ -27,7 +27,7 @@ pub fn build(b: *std.Build) !void {
                 .Inherit,
             ) catch break :blk version;
 
-            var it = mem.split(u8, mem.trim(u8, git_describe_long, &std.ascii.whitespace), "-");
+            var it = mem.splitScalar(u8, mem.trim(u8, git_describe_long, &std.ascii.whitespace), '-');
             _ = it.next().?; // previous tag
             const commit_count = it.next().?;
             const commit_hash = it.next().?;
@@ -68,7 +68,7 @@ pub fn build(b: *std.Build) !void {
 
     const scanner = Scanner.create(b, .{});
 
-    scanner.addCustomProtocol("protocol/river-layout-v3.xml");
+    scanner.addCustomProtocol(b.path("protocol/river-layout-v3.xml"));
 
     scanner.generate("wl_output", 4);
     scanner.generate("river_layout_manager_v3", 2);
@@ -91,8 +91,6 @@ pub fn build(b: *std.Build) !void {
     exe.linkSystemLibrary("wayland-client");
 
     exe.root_module.addImport("flags", flags);
-
-    scanner.addCSource(exe);
 
     exe.pie = pie;
 

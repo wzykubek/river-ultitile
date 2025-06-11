@@ -128,7 +128,7 @@ fn handleLayoutDemand(layout_proto: *river.LayoutV3, output: *Output, view_count
 }
 
 pub fn main() !void {
-    const res = flags.parser([*:0]const u8, &.{
+    const res = flags.Parser([*:0]const u8, &.{
         .{ .name = "h", .kind = .boolean },
         .{ .name = "-version", .kind = .boolean },
     }).parse(std.os.argv[1..]) catch {
@@ -194,9 +194,9 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *
 fn registryEvent(context: *Context, registry: *wl.Registry, event: wl.Registry.Event) !void {
     switch (event) {
         .global => |ev| {
-            if (mem.orderZ(u8, ev.interface, river.LayoutManagerV3.getInterface().name) == .eq) {
+            if (mem.orderZ(u8, ev.interface, river.LayoutManagerV3.interface.name) == .eq) {
                 context.layout_manager = try registry.bind(ev.name, river.LayoutManagerV3, 2);
-            } else if (mem.orderZ(u8, ev.interface, wl.Output.getInterface().name) == .eq) {
+            } else if (mem.orderZ(u8, ev.interface, wl.Output.interface.name) == .eq) {
                 const wl_output = try registry.bind(ev.name, wl.Output, 4);
                 errdefer wl_output.release();
 

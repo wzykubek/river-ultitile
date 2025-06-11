@@ -17,8 +17,9 @@ A layout generator for **[river]**. Features include:
 Requirements:
 
 - [Zig]
-    - Zig 0.13 since v1.2.0
-    - Zig 0.12 up to [v1.1.2](https://git.sr.ht/~midgard/river-ultitile/tree/v1.1.2/item/README.md)
+    - Zig 0.14 since v1.3.0
+    - Zig 0.13 up to [v1.2.1](https://git.sr.ht/~midgard/river-ultitile/tree/v1.2.1/item/README.md)
+    - Zig 0.12 up to [v1.1.3](https://git.sr.ht/~midgard/river-ultitile/tree/v1.1.3/item/README.md)
 - [wayland-protocols]
 
 Download the sources with
