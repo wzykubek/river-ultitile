@@ -111,9 +111,9 @@ fn handleLayoutDemand(layout_proto: *river.LayoutV3, output: *Output, view_count
 
     const view_dimensions = try layout.layout(allocator, &root_tile, view_count, @as(u31, @truncate(usable_width)), @as(u31, @truncate(usable_height)));
 
-    log.info("Proposing {} views:", .{view_dimensions.len});
+    log.debug("Proposing {} views:", .{view_dimensions.len});
     for (view_dimensions) |dim| {
-        log.info("- {}+{} {}x{}", .{ dim.x, dim.y, dim.width, dim.height });
+        log.debug("- {}+{} {}x{}", .{ dim.x, dim.y, dim.width, dim.height });
         layout_proto.pushViewDimensions(
             dim.x,
             dim.y,

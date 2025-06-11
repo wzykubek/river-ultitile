@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 ### Changed
 - Migrate to Zig 0.13
+- Only log the proposed views on debug builds
 ### Deprecated
 ### Removed
 ### Fixed

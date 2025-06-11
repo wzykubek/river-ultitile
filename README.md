@@ -164,6 +164,9 @@ Of course you can also use dynamic parameters in your custom layout. The `variab
 to the `layoutSpecification` function has methods `getString`, `getInteger` and `getBoolean` for
 that. Make sure to specify a default value in `setDefaultVariables`, or `get…` will return null.
 
+If your layout is not behaving as expected, you can build river-ultitile in debug mode (with
+`-Doptimize=Debug`) which will cause river-ultitile to log each view it's proposing.
+
 ## Contributing
 
 See [CONTRIBUTING.md]
