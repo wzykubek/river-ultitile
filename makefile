@@ -1,7 +1,7 @@
 # Read Zig version from build.zig
-ZIG_VERSION != sed -nE '/const zig_major = ([0-9]+);/{N;s/.*const zig_major = ([0-9]+);(.|\n)*const zig_minor = ([0-9]+);.*/\1.\3/p}' ./build.zig
+ZIG_VERSION != sed -nE '/\.zig_version/{s/.*\.zig_version = "([0-9]+\.[0-9]+)\.[0-9]+.*",.*/\1/p;q}' ./build.zig.zon
 ifeq ($(ZIG_VERSION),)
-$(error "Zig version not detected in build.zig")
+$(error "Zig version not detected in build.zig.zon")
 endif
 
 # Find specified Zig version in PATH (a bit involved to allow for arbitrary patch versions)

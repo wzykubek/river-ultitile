@@ -1,8 +1,16 @@
 .{
+    .zig_version = "0.14.0",
+
     .name = .river_ultitile,
     .fingerprint = 0x1d838e63f893dfa6,
-    // Managed by release.sh
+
+    // The release.sh script takes care of updating this version number.
+    // While a river-ultitile release is in development, this string contains the version in
+    // development with the "-dev" suffix.  When a release is tagged, the "-dev" suffix is removed
+    // for the commit that gets tagged. Directly after the tagged commit, the version is bumped
+    // and the "-dev" suffix re-added.
     .version = "1.3.1-dev",
+
     .dependencies = .{
         .wayland = .{
             .url = "https://codeberg.org/ifreund/zig-wayland/archive/v0.3.0.tar.gz",
