@@ -21,7 +21,7 @@ endif
 
 .PHONY: build debug install run test
 build: ; $(ZIG) build -Doptimize=ReleaseSafe
-debug: ; $(ZIG) build -Doptimize=Debug
+debug: ; $(ZIG) build -Doptimize=Debug -freference-trace
 install: ; $(ZIG) build -Doptimize=ReleaseSafe install
 test:
 	$(ZIG) test src/util.zig
