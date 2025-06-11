@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 ### Removed
 ### Fixed
+- Improve documentation in README.md some more
 ### Security
 
 ## [1.1.2] - 2025-06-11

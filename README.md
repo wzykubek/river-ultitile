@@ -43,6 +43,8 @@ expected, look there.
 
 ### Example **river** init file snippet
 This snippet can be integrated in your **river** init file (usually `$XDG_CONFIG_HOME/river/init`).
+(If you're just getting started with **river**, note that you will want to add more than this. Look
+at **river**'s documentation and default init file for that.)
 
 ```bash
 mod=Super
@@ -56,13 +58,13 @@ riverctl map normal $mod Z zoom
 riverctl default-layout river-ultitile
 river-ultitile &
 
-# These keybinds work with the default river-ultitile configuration
+# These keybinds work with the default river-ultitile layouts
 # Increase/decrease the main size
 riverctl map normal $mod U send-layout-cmd river-ultitile "set integer main-size += 4"
 riverctl map normal $mod I send-layout-cmd river-ultitile "set integer main-size -= 4"
 
-# Decrease/increase the main size if it is in the center (on widescreens) and there are no views to
-# the left or right
+# Decrease/increase the main size if it is in the center (on widescreens) and
+# there are no views to the left or right
 riverctl map normal $mod+Shift U send-layout-cmd river-ultitile "set integer main-size-if-only-centered-main += 4"
 riverctl map normal $mod+Shift I send-layout-cmd river-ultitile "set integer main-size-if-only-centered-main -= 4"
 
