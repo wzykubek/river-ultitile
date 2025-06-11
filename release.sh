@@ -20,7 +20,7 @@ if [ "v$version" != "$prev_version" ]; then
 	sed -i 's/## \[Unreleased\]/&\n### Added\n### Changed\n### Deprecated\n### Removed\n### Fixed\n### Security\n\n## ['"$version"'] - '"$(date --utc +%Y-%m-%d)"'/' CHANGELOG.md
 	echo; echo "Inspect CHANGELOG..."
 	${EDITOR:-nano} CHANGELOG.md
-	git add build.zig CHANGELOG.md README.md
+	git add build.zig build.zig.zon CHANGELOG.md README.md
 	git commit -m "build: Release version $version"
 
 	echo "Creating git tag $tagid"
@@ -47,7 +47,7 @@ if [ "v$version" != "$prev_version" ]; then
 	read next_version
 	sed -i 's/const version = ".*";/const version = "'"$next_version"'-dev";/' build.zig
 	sed -i 's/\.version = ".*",/.version = "'"$next_version"'",/' build.zig.zon
-	git add build.zig
+	git add build.zig build.zig.zon
 	git commit -m "build: Bump to version $next_version-dev"
 	printf "\n\nRemember to 'git push origin %s'\n" "$tagid"
 else
