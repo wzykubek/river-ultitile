@@ -44,7 +44,7 @@ if [ "v$version" != "$prev_version" ]; then
 	printf 'Next version? v'
 	read next_version
 	sed -i 's/const version = ".*";/const version = "'"$next_version"'-dev";/' build.zig
-	sed -i 's/\.version = ".*",/.version = "'"$next_version"'",/' build.zig.zon
+	sed -i 's/\.version = ".*",/.version = "'"$next_version"'-dev",/' build.zig.zon
 	git add build.zig build.zig.zon
 	git commit -m "build: Bump to version $next_version-dev"
 	printf "\n\nRemember to 'git push origin %s'\n" "$tagid"
