@@ -19,8 +19,8 @@ pub fn layoutSpecification(allocator: std.mem.Allocator, variables: *config.Vari
     // Minimum width to enable the widescreen mode of the main layout
     const min_width_for_center_main = 2200;
 
-    const inner_gaps = 5;
-    const outer_gaps = 5;
+    const inner_gaps = 0;
+    const outer_gaps = 0;
 
     // Smart gaps: return just a simple margin-less tile if there's only one view and the
     // widescreen mode is not to be enabled. If you want gaps around your view even if it's the
