@@ -51,7 +51,7 @@ pub fn layoutSpecification(allocator: std.mem.Allocator, variables: *config.Vari
             // Left, only in widescreen mode
             if (usable_width >= min_width_for_center_main) {
                 var left = try root.addSubtile("left");
-                left.max_views = null;
+                left.max_views = 1;
                 left.order = 1;
                 left.suborder = 0;
                 left.stretch = 100 -| applicable_main_size;
