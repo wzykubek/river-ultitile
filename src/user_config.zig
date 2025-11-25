@@ -26,7 +26,7 @@ pub fn layoutSpecification(allocator: std.mem.Allocator, variables: *config.Vari
     // widescreen mode is not to be enabled. If you want gaps around your view even if it's the
     // only view, you can comment this out or add a margin to this root tile
     if (view_count == 1 and (layout != .main or usable_width < min_width_for_center_main)) {
-        var root = try config.Tile.init(allocator, "root");
+        var root = try config.Tile.init(allocator, "solo");
         root.max_views = null;
         return root;
     }
@@ -44,7 +44,7 @@ pub fn layoutSpecification(allocator: std.mem.Allocator, variables: *config.Vari
             // above and uncomment the code below
             //const applicable_main_size = normal_main_size;
 
-            var root = try config.Tile.init(allocator, "root");
+            var root = try config.Tile.init(allocator, "main");
             root.margin = outer_gaps;
             root.padding = inner_gaps;
 
@@ -79,7 +79,7 @@ pub fn layoutSpecification(allocator: std.mem.Allocator, variables: *config.Vari
         },
 
         .hstack => {
-            var root = try config.Tile.init(allocator, "root");
+            var root = try config.Tile.init(allocator, "hstack");
             root.max_views = null;
             root.margin = outer_gaps;
             root.padding = inner_gaps;
@@ -87,7 +87,7 @@ pub fn layoutSpecification(allocator: std.mem.Allocator, variables: *config.Vari
         },
 
         .vstack => {
-            var root = try config.Tile.init(allocator, "root");
+            var root = try config.Tile.init(allocator, "vstack");
             root.typ = .vsplit;
             root.max_views = null;
             root.margin = outer_gaps;
@@ -96,7 +96,7 @@ pub fn layoutSpecification(allocator: std.mem.Allocator, variables: *config.Vari
         },
 
         .monocle => {
-            var root = try config.Tile.init(allocator, "root");
+            var root = try config.Tile.init(allocator, "mono");
             root.typ = .overlay;
             root.max_views = null;
             return root;
